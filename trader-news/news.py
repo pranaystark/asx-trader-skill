@@ -436,7 +436,7 @@ def main(argv=None):
     ap.add_argument("--hours", type=float, default=48, help="ignore items older than this")
     ap.add_argument("--all", action="store_true", help="show seen items too")
     ap.add_argument("--count", type=int, default=10, help="announcements per ticker")
-    ap.add_argument("--no-announcements", "--no-sec", dest="no_announcements",
+    ap.add_argument("--no-announcements", dest="no_announcements",
                     action="store_true", help="headlines only")
     ap.add_argument("--no-moves", action="store_true", help="skip the price line per ticker")
     ap.add_argument("--move-pct", type=float, default=MOVE_PCT, help="flag a move this big (percent)")
