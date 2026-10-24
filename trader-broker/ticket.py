@@ -370,9 +370,7 @@ def render(order, idx, total, cfg, risk, state, today):
         lines.append("  Your agent drafts this with the Interactive Brokers connector. IBKR sends it to your")
         lines.append("  IBKR account, and it only goes to the market after you approve it there.")
     else:
-        lines.append("  Place these fields at your broker, exactly:")
-        for l in json.dumps(tool_input(order), indent=2).splitlines():
-            lines.append("    " + l)
+        lines.append("  Place those fields at your broker exactly as listed above.")
         if is_bracket(order):
             lines.append("  Your broker places the entry, then the stop-loss and the take-profit as two orders")
             lines.append("  that cancel each other: when one fills, the other is canceled.")
@@ -524,7 +522,8 @@ def cmd_approve(a):
         print("Now draft it with the Interactive Brokers connector; approve it in your IBKR account.")
     else:
         print("Now place these fields at your broker, exactly:")
-        print(json.dumps(tool_input(order), indent=2))
+        for p in plain_parts(order):
+            print("  " + p)
         print("If your broker is wired in as a tool, its card shows Allow once / Deny. Then: ticket.py result --index %d --status "
               "placed|denied|failed" % a.index)
     return 0
