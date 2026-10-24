@@ -30,7 +30,7 @@ and a neat plan does not change that.
 python3 "${CLAUDE_SKILL_DIR}/exit.py" plan                          # trader/entry.json: midpoint stop, 2R target
 python3 "${CLAUDE_SKILL_DIR}/exit.py" plan --stop or-mid --target 1R --write
 python3 "${CLAUDE_SKILL_DIR}/exit.py" plan --stop atr:1.5           # needs the session's bars (Yahoo or --offline)
-python3 "${CLAUDE_SKILL_DIR}/exit.py" plan --symbol TSLA --entry 364.18 --or-high 362.18 --or-low 354.47
+python3 "${CLAUDE_SKILL_DIR}/exit.py" plan --symbol BHP --entry 364.18 --or-high 362.18 --or-low 354.47
 python3 "${CLAUDE_SKILL_DIR}/exit.py" show                          # the current trader/plan.json
 ```
 
@@ -83,23 +83,23 @@ A level setup has no opening range to lean on, so it needs a stop you name.
 5. Say once that the stop is a plan, not a guarantee.
 6. Hand off to `/trader-timemachine` to replay the plan, then `/trader-budget`
    to size it to the max loss per trade. Offer `/trader-alerts` for the stop,
-   the target and the flat-by time. Claude can keep `entry.py watch` running
+   the target and the flat-by time. your agent can keep `entry.py watch` running
    in the background or on a `/loop` until a setup triggers, then come here.
 
 ## Example: the reel
 
-TSLA, Monday 2026-10-19. The entry is 364.18 at 10:15 AM (the 10:10 bar,
+BHP, Monday 2026-10-19. The entry is 364.18 at 10:15 AM (the 10:10 bar,
 bar 8) and the opening range is 354.47 to 362.18. `exit.py plan --stop
 or-mid --target 1R --write`:
 
 ```
-Exit plan: TSLA long, Mon 2026-10-19, opening-range breakout on 5-minute bars
+Exit plan: BHP long, Mon 2026-10-19, opening-range breakout on 5-minute bars
   Entry         $364.18 at 10:15 AM (bar 8)
   Stop          $358.32  opening-range midpoint: ($362.18 + $354.47) / 2 = $358.325, rounded down
   Target        $370.04  1R (one times the risk)
   Risk a share  $5.86 (1.61% of the entry)
   Reward:risk   1.0
-  Flat by       15:55 ET, win or lose: no overnight hold
+  Flat by       15:55 AEST, win or lose: no overnight hold
 ```
 
 The default 2R target would be 364.18 + 2 x 5.86 = 375.90. trader-budget then
@@ -126,7 +126,7 @@ make a plan pass, and never calls a stop a guarantee.
 - Paper trading by default (`"paper": true`). Going live is the user's own decision, in their own config.
 - Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk
   passed that exact order today, the user typed an explicit yes for that one order in the chat, and the
-  user clicked Allow once on Claude's own card because the order tool is set to "Needs approval"
+  user clicked Allow once on your agent's own card because the order tool is set to "Needs approval"
   (Customize > Connectors > tool permissions). Never set an order tool to "Always allow".
 - No options, margin, short selling or leverage unless the config allows it and the user confirms.
-- Broker keys live in environment variables or the Claude Desktop config, never in the chat.
+- Broker keys live in environment variables or the your agent app config, never in the chat.

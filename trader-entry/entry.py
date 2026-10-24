@@ -2,22 +2,22 @@
 """Entry Timer for trader-entry: watches a setup bar by bar and says the
 moment to get in. Standard library only. Long side only. It never places an order.
 
-    python3 entry.py check TSLA                          # opening-range breakout, 5-minute bars
-    python3 entry.py check TSLA --now "2026-10-19 10:15" --offline TSLA.json
-    python3 entry.py check TSLA --setup level --level 371.20    # first close above a price
-    python3 entry.py check TSLA --interval 1m --min-volume-x 1.5 --write
-    python3 entry.py watch TSLA --every 30 --until 15:30  # one line per closed bar
+    python3 entry.py check BHP                          # opening-range breakout, 5-minute bars
+    python3 entry.py check BHP --now "2026-10-19 10:15" --offline BHP.json
+    python3 entry.py check BHP --setup level --level 371.20    # first close above a price
+    python3 entry.py check BHP --interval 1m --min-volume-x 1.5 --write
+    python3 entry.py watch BHP --every 30 --until 15:30  # one line per closed bar
     python3 entry.py watchlist                            # every hit in trader/watchlist.json
 
 Setups (v2 plans longs only):
   orb    opening-range breakout. The range is the high and low of the first
-         --or-minutes (default 15: the 9:30, 9:35 and 9:40 five-minute bars).
+         --or-minutes (default 15: the 10:00, 9:35 and 9:40 five-minute bars).
          It triggers on the first COMPLETED bar after the range that CLOSES
          above the range high. A wick above the high is not a trigger.
   level  the first completed bar that closes above --level (for example a
          20-day high from trader-scanner).
   --min-volume-x X  the trigger bar also needs at least X times the average
-         volume of the opening-range bars (the 9:30 bar carries the opening
+         volume of the opening-range bars (the 10:00 bar carries the opening
          auction, so 1.0 is already a high bar).
 
 A trigger's time is the trigger bar's CLOSE time (the 10:10 bar closes at
@@ -31,7 +31,7 @@ on a 1:00 p.m. early close the cutoff moves up three hours with the close);
 no-data (the market is closed today or Yahoo sent no bars).
 
 trader/config.json (optional): "no_entries_before" (09:45) and
-"no_entries_after" (15:30), New York time.
+"no_entries_after" (15:30), Sydney time.
 
 watch wakes just after each bar closes (bars only change then), re-polls every
 --every seconds (default 30) while Yahoo has not posted the new bar, prints one
@@ -40,7 +40,7 @@ on expiry, at the close or at --until (exit 1). With --now or --offline it runs
 on a simulated clock and replays the day without sleeping.
 
 Data: Yahoo's free chart JSON (unofficial, can lag, bars not single trades)
-  https://query2.finance.yahoo.com/v8/finance/chart/TSLA?range=1d&interval=5m
+  https://query2.finance.yahoo.com/v8/finance/chart/BHP?range=1d&interval=5m
   falls back to query1 on HTTP 429 or 5xx; a 429 gets one retry after a pause.
   --offline PATH reads a saved chart JSON (.json or .json.gz) instead, or
   PATH/<TICKER>.json when PATH is a folder. Without --now, an offline file is
@@ -71,37 +71,33 @@ INTERVALS = {"1m": 60, "5m": 300}
 DEFAULTS = {"no_entries_before": "09:45", "no_entries_after": "15:30"}
 EPOCH = datetime.datetime(1970, 1, 1)
 
-NYSE_HOLIDAYS = {
+ASX_HOLIDAYS = {  # full-day closures; ASX trading calendar, read 2026-10-24
     "2026-01-01": "New Year's Day",
-    "2026-01-19": "Martin Luther King, Jr. Day",
-    "2026-02-16": "Washington's Birthday",
+    "2026-01-26": "Australia Day",
     "2026-04-03": "Good Friday",
-    "2026-05-25": "Memorial Day",
-    "2026-06-19": "Juneteenth National Independence Day",
-    "2026-07-03": "Independence Day (observed)",
-    "2026-09-07": "Labor Day",
-    "2026-11-26": "Thanksgiving Day",
+    "2026-04-06": "Easter Monday",
+    "2026-06-08": "King's Birthday",
     "2026-12-25": "Christmas Day",
+    "2026-12-28": "Boxing Day (observed)",
     "2027-01-01": "New Year's Day",
-    "2027-01-18": "Martin Luther King, Jr. Day",
-    "2027-02-15": "Washington's Birthday",
+    "2027-01-26": "Australia Day",
     "2027-03-26": "Good Friday",
-    "2027-05-31": "Memorial Day",
-    "2027-06-18": "Juneteenth National Independence Day (observed)",
-    "2027-07-05": "Independence Day (observed)",
-    "2027-09-06": "Labor Day",
-    "2027-11-25": "Thanksgiving Day",
-    "2027-12-24": "Christmas Day (observed)",
+    "2027-03-29": "Easter Monday",
+    "2027-04-26": "ANZAC Day (observed)",
+    "2027-06-14": "King's Birthday",
+    "2027-12-27": "Christmas Day (observed)",
+    "2027-12-28": "Boxing Day (observed)",
 }
-NYSE_EARLY_CLOSE = {  # 1:00 p.m. ET
-    "2026-11-27": "day after Thanksgiving",
+ASX_EARLY_CLOSE = {  # normal trading ceases 14:10 Sydney time
     "2026-12-24": "Christmas Eve",
-    "2027-11-26": "day after Thanksgiving",
+    "2026-12-31": "New Year's Eve",
+    "2027-12-24": "Christmas Eve",
+    "2027-12-31": "New Year's Eve",
 }
 CALENDAR_YEARS = (2026, 2027)
-OPEN = datetime.time(9, 30)
+OPEN = datetime.time(10, 0)
 CLOSE = datetime.time(16, 0)
-EARLY = datetime.time(13, 0)
+EARLY = datetime.time(14, 10)
 
 
 class EntryError(Exception):
@@ -110,33 +106,37 @@ class EntryError(Exception):
 
 # ---------------------------------------------------------------- time
 
-def _nth_sunday(year, month, n):
+def _first_sunday(year, month):
     d = datetime.date(year, month, 1)
     d += datetime.timedelta(days=(6 - d.weekday()) % 7)
-    return d + datetime.timedelta(weeks=n - 1)
+    return d
 
 
-def eastern_offset(utc):
-    """Hours from UTC for New York: -4 in daylight time, -5 otherwise.
-    DST runs from 2:00 a.m. on the second Sunday of March to 2:00 a.m. on the
-    first Sunday of November (US rule since 2007)."""
+def sydney_offset(utc):
+    """Hours from UTC for Sydney: +11 in daylight time (AEDT), +10 otherwise (AEST).
+    DST runs from 2:00 a.m. on the first Sunday of October to 3:00 a.m. on the
+    first Sunday of April (Australian rule)."""
     y = utc.year
-    start = datetime.datetime.combine(_nth_sunday(y, 3, 2), datetime.time(7, 0))   # 2:00 EST
-    end = datetime.datetime.combine(_nth_sunday(y, 11, 1), datetime.time(6, 0))    # 2:00 EDT
     naive = utc.replace(tzinfo=None)
-    return -4 if start <= naive < end else -5
+    start = datetime.datetime.combine(_first_sunday(y, 10) - datetime.timedelta(days=1), datetime.time(16, 0))  # 02:00 AEST
+    end = datetime.datetime.combine(_first_sunday(y, 4) - datetime.timedelta(days=1), datetime.time(16, 0))    # 03:00 AEDT
+    if naive >= start:      # Oct-Dec: DST (ends next April)
+        return 11
+    if naive < end:         # Jan-Mar and early April: DST
+        return 11
+    return 10
 
 
-def to_eastern(utc):
-    return utc.replace(tzinfo=None) + datetime.timedelta(hours=eastern_offset(utc))
+def to_sydney(utc):
+    return utc.replace(tzinfo=None) + datetime.timedelta(hours=sydney_offset(utc))
 
 
-def eastern_to_utc(local):
-    for off in (-4, -5):
+def sydney_to_utc(local):
+    for off in (11, 10):
         utc = local - datetime.timedelta(hours=off)
-        if eastern_offset(utc) == off:
+        if sydney_offset(utc) == off:
             return utc
-    return local + datetime.timedelta(hours=5)
+    return local - datetime.timedelta(hours=10)
 
 
 def utc_now():
@@ -158,28 +158,28 @@ def iso(utc):
 
 def parse_now(text):
     """--now -> naive UTC. "2026-10-19 10:15" (or ...T10:15, or just 10:15 for
-    today) is New York time; an offset or Z makes it absolute."""
+    today) is Sydney time; an offset or Z makes it absolute."""
     if not text:
         return utc_now()
     t = text.strip()
-    if t.upper().endswith(" ET"):
+    if t.upper().endswith(" AEST"):
         t = t[:-3].strip()
     if re.match(r"^\d{1,2}:\d{2}$", t):
-        t = "%s %s" % (to_eastern(utc_now()).date().isoformat(), t.zfill(5))
+        t = "%s %s" % (to_sydney(utc_now()).date().isoformat(), t.zfill(5))
     t = t.replace("Z", "+00:00")
     try:
         dt = datetime.datetime.fromisoformat(t)
     except ValueError:
-        raise EntryError('--now wants a New York time like "2026-10-19 10:15" (or ...Z for UTC)')
+        raise EntryError('--now wants a Sydney time like "2026-10-19 10:15" (or ...Z for UTC)')
     if dt.tzinfo is None:
-        return eastern_to_utc(dt)
+        return sydney_to_utc(dt)
     return (dt - dt.utcoffset()).replace(tzinfo=None)
 
 
 def parse_hhmm(text, what):
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", str(text))
     if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
-        raise EntryError("%s wants a New York time like 15:30, not %r" % (what, text))
+        raise EntryError("%s wants a Sydney time like 15:30, not %r" % (what, text))
     return datetime.time(int(m.group(1)), int(m.group(2)))
 
 
@@ -199,28 +199,28 @@ def ampm(t):
 
 
 def trading_day(d):
-    """(is_trading_day, reason). Weekends and the NYSE holiday list."""
+    """(is_trading_day, reason). Weekends and the ASX holiday list."""
     if d.weekday() >= 5:
         return False, "weekend"
-    name = NYSE_HOLIDAYS.get(d.isoformat())
+    name = ASX_HOLIDAYS.get(d.isoformat())
     if name:
-        return False, "NYSE holiday: " + name
+        return False, "ASX holiday: " + name
     return True, ""
 
 
 def session(d):
-    """(open_time, close_time) in New York time, or None if closed all day."""
+    """(open_time, close_time) in Sydney time, or None if closed all day."""
     ok, _ = trading_day(d)
     if not ok:
         return None
-    return OPEN, (EARLY if d.isoformat() in NYSE_EARLY_CLOSE else CLOSE)
+    return OPEN, (EARLY if d.isoformat() in ASX_EARLY_CLOSE else CLOSE)
 
 
 def next_open(d):
     nd = d + datetime.timedelta(days=1)
     for _ in range(15):
         if session(nd):
-            return "%s 09:30" % nd.isoformat()
+            return "%s 10:00" % nd.isoformat()
         nd += datetime.timedelta(days=1)
     return None
 
@@ -228,7 +228,8 @@ def next_open(d):
 # ---------------------------------------------------------------- Yahoo
 
 def yahoo_symbol(sym):
-    return sym.upper().replace(".", "-")
+    s = sym.upper()
+    return s if s.endswith(".AX") else s + ".AX"
 
 
 def chart_path(sym, rng, interval):
@@ -361,7 +362,7 @@ def get_chart(sym, interval, day=None, offline=None, today=None):
         except (OSError, ValueError) as e:
             raise EntryError("could not read %s: %s" % (f, e))
     else:
-        today = today or to_eastern(utc_now()).date()
+        today = today or to_sydney(utc_now()).date()
         text = yahoo_get(chart_path(sym, chart_range(day or today, today, interval), interval))
     ch = parse_chart(text, sym)
     if ch["symbol"] != yahoo_symbol(sym):
@@ -419,7 +420,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     if setup == "level" and level is None:
         raise EntryError("--setup level needs --level PRICE (for example a 20-day high)")
     n_or = or_minutes * 60 // step
-    local = to_eastern(now_utc)
+    local = to_sydney(now_utc)
     day = local.date()
     res = {"symbol": chart["symbol"], "setup": setup, "side": "buy", "date": day.isoformat(),
            "interval": interval, "or_minutes": or_minutes, "now": local.strftime("%Y-%m-%d %H:%M:%S"), "status": "waiting",
@@ -427,10 +428,10 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
            "last": None, "forming": None, "min_volume_x": min_volume_x,
            "prev_close": chart.get("prev_close"), "calendar_known": day.year in CALENDAR_YEARS, "_bars": []}
     dt = chart.get("data_time")
-    res["data_time"] = to_eastern(utc_of(dt)).strftime("%Y-%m-%d %H:%M:%S") if dt else None
+    res["data_time"] = to_sydney(utc_of(dt)).strftime("%Y-%m-%d %H:%M:%S") if dt else None
     ok, why = trading_day(day)
     if not ok:
-        res.update(status="no-data", phase="closed", reason="the NYSE is closed today (%s)" % why,
+        res.update(status="no-data", phase="closed", reason="the ASX is closed today (%s)" % why,
                    next_open=next_open(day))
         return res
     o, c = session(day)
@@ -440,14 +441,14 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     before = datetime.datetime.combine(day, parse_hhmm(cfg["no_entries_before"], "no_entries_before"))
     cutoff = early_cutoff(day, parse_hhmm(cfg["no_entries_after"], "no_entries_after"), close_dt)
     or_end = open_dt + datetime.timedelta(minutes=or_minutes)
-    res.update(opens=hm(o), closes=hm(c), early_close=NYSE_EARLY_CLOSE.get(day.isoformat()),
+    res.update(opens=hm(o), closes=hm(c), early_close=ASX_EARLY_CLOSE.get(day.isoformat()),
                no_entries_before=hm(before), no_entries_after=hm(cutoff))
 
     by_slot = {}
     for b in chart["bars"]:
         if b["t"] % step:
             continue                       # Yahoo's live tick (10:49:45) is not a bar
-        et = to_eastern(utc_of(b["t"]))
+        et = to_sydney(utc_of(b["t"]))
         if et.date() != day or not (open_dt <= et < close_dt):
             continue
         slot = int((et - open_dt).total_seconds()) // step
@@ -467,7 +468,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
                 pending = b
                 res["forming"] = {"bar_start": hm(b["et"]), "closes": ampm(b["end"]), "price": r2(b["c"])}
                 res["lag_note"] = ("Yahoo's last trade is %s, before the %s bar's close: it counts once Yahoo "
-                                   "catches up (a minute at most)" % (to_eastern(utc_of(dt)).strftime("%H:%M:%S"),
+                                   "catches up (a minute at most)" % (to_sydney(utc_of(dt)).strftime("%H:%M:%S"),
                                                                        short(b["et"])))
         elif b["et"] <= local:
             res["forming"] = {"bar_start": hm(b["et"]), "closes": ampm(b["end"]), "price": r2(b["c"])}
@@ -475,7 +476,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     res["bars_closed"] = len(bars)
 
     if local < open_dt:
-        res.update(phase="pre-open", reason="the NYSE opens at 9:30%s" % (
+        res.update(phase="pre-open", reason="the ASX opens at 10:00%s" % (
             " and the %d-minute range is set at %s" % (or_minutes, short(or_end)) if setup == "orb" else ""))
         return res
 
@@ -523,9 +524,9 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
                           "bar_index": trig["slot"], "price": r2(trig["c"]), "close": trig["c"],
                           "volume": trig["v"], "volume_x": r2(vx), "pct_over": r2(100.0 * (trig["c"] / lvl - 1))}
         res["minutes_since"] = int((local - trig["end"]).total_seconds() // 60)
-        if dt and utc_of(dt) < eastern_to_utc(trig["end"]):
+        if dt and utc_of(dt) < sydney_to_utc(trig["end"]):
             res["data_note"] = ("Yahoo's last trade is %s, before this bar closed: its close can still move a cent or two"
-                                % to_eastern(utc_of(dt)).strftime("%H:%M:%S"))
+                                % to_sydney(utc_of(dt)).strftime("%H:%M:%S"))
         return res
     if not bars:
         res.update(status="no-data", phase="open", reason="Yahoo sent no bars for %s yet" % day.isoformat())
@@ -595,7 +596,7 @@ def describe(res):
     """Plain lines for a person."""
     when = datetime.datetime.strptime(res["now"], "%Y-%m-%d %H:%M:%S")
     bars = "5-minute" if res["interval"] == "5m" else "1-minute"
-    head = "%s  %s %s ET  %s on %s bars (Yahoo, free, can lag)" % (
+    head = "%s  %s %s AEST  %s on %s bars (Yahoo, free, can lag)" % (
         res["symbol"], when.strftime("%a %Y-%m-%d"), when.strftime("%H:%M"), setup_name(res), bars)
     if res.get("data_time") and res["data_time"] <= res["now"] and res["data_time"][:10] == res["date"]:
         head += ", data to %s" % res["data_time"][11:]
@@ -638,12 +639,12 @@ def describe(res):
         if res["status"] == "expired":
             out.append("No entry on this setup today. Nothing was placed.")
         if res.get("next_open"):
-            out.append("Next open: %s New York." % res["next_open"])
+            out.append("Next open: %s Sydney." % res["next_open"])
     if res.get("early_close"):
         out.append("Early close today at 1:00 p.m. (%s): no new entries after %s." % (
             res["early_close"], res["no_entries_after"]))
     if not res.get("calendar_known"):
-        out.append("Holiday list covers %s only: check nyse.com for this date." % " and ".join(map(str, CALENDAR_YEARS)))
+        out.append("Holiday list covers %s only: check asx.com.au for this date." % " and ".join(map(str, CALENDAR_YEARS)))
     return out
 
 
@@ -705,7 +706,7 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
         if next_fetch is not None and now < next_fetch:
             sleep(max(1, min(every, (next_fetch - now).total_seconds())))
             continue
-        local = to_eastern(now)
+        local = to_sydney(now)
         day = local.date()
         s = session(day)
         if not s:
@@ -715,18 +716,18 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
         close_dt = datetime.datetime.combine(day, s[1])
         if local < open_dt + datetime.timedelta(seconds=step):
             if not said_preopen:
-                emit("%s ET  %s: watching from the first bar's close at %s." % (
+                emit("%s AEST  %s: watching from the first bar's close at %s." % (
                     local.strftime("%H:%M"), "not open yet" if local < open_dt else "open, no bar closed yet",
                     short(open_dt + datetime.timedelta(seconds=step))))
                 said_preopen = True
-            next_fetch = eastern_to_utc(open_dt) + datetime.timedelta(seconds=step + GRACE)
+            next_fetch = sydney_to_utc(open_dt) + datetime.timedelta(seconds=step + GRACE)
             continue
         try:
             chart = provider(now)
             errors = 0
         except EntryError as e:
             errors += 1
-            emit("%s ET  could not read bars: %s" % (local.strftime("%H:%M:%S"), e))
+            emit("%s AEST  could not read bars: %s" % (local.strftime("%H:%M:%S"), e))
             if errors >= max_errors:
                 emit("Stopping after %d failed reads in a row." % errors)
                 return 1, None
@@ -796,12 +797,12 @@ def _opts(a, cfg):
 
 def _load(a, sym, now):
     """(chart, now). An offline file without --now is read as of its own time."""
-    real_today = to_eastern(utc_now()).date()
+    real_today = to_sydney(utc_now()).date()
     if a.offline and now is None:
         ch = get_chart(sym, a.interval, offline=a.offline)
         return ch, (utc_of(ch["data_time"]) if ch.get("data_time") else utc_now())
     now = now or utc_now()
-    return get_chart(sym, a.interval, to_eastern(now).date(), a.offline, real_today), now
+    return get_chart(sym, a.interval, to_sydney(now).date(), a.offline, real_today), now
 
 
 def cmd_check(a):
@@ -836,15 +837,15 @@ def cmd_watch(a):
         now_fn, sleep_fn = clock.now, clock.sleep
     else:
         now_fn, sleep_fn = utc_now, _sleep
-    real_today = to_eastern(utc_now()).date()
+    real_today = to_sydney(utc_now()).date()
 
     def provider(now):
-        return get_chart(sym, a.interval, to_eastern(now).date(), a.offline, real_today)
+        return get_chart(sym, a.interval, to_sydney(now).date(), a.offline, real_today)
 
     until = None
     if a.until:
         t = parse_hhmm(a.until, "--until")
-        until = datetime.datetime.combine(to_eastern(now_fn()).date(), t)
+        until = datetime.datetime.combine(to_sydney(now_fn()).date(), t)
 
     def on_trigger(res, now):
         write_json(a.out, entry_doc(res, now))
@@ -922,7 +923,7 @@ def main(argv=None):
         p.add_argument("--level", type=float, help="the price to close above (--setup level)")
         p.add_argument("--min-volume-x", type=float, help="trigger bar volume vs the range bars' average")
         p.add_argument("--side", default="buy", choices=["buy", "long", "sell", "short"], help="v2: buy only")
-        p.add_argument("--now", help='pretend it is this New York time, e.g. "2026-10-19 10:15"')
+        p.add_argument("--now", help='pretend it is this Sydney time, e.g. "2026-10-19 10:15"')
         p.add_argument("--offline", metavar="PATH", help="saved Yahoo chart JSON (.json/.json.gz) or a folder")
         p.add_argument("--config", default="trader/config.json")
 
@@ -936,7 +937,7 @@ def main(argv=None):
     p.add_argument("symbol")
     common(p)
     p.add_argument("--every", type=float, default=30, help="seconds between polls while Yahoo is behind")
-    p.add_argument("--until", help="stop at this New York time (HH:MM)")
+    p.add_argument("--until", help="stop at this Sydney time (HH:MM)")
     p.add_argument("--out", default="trader/entry.json", help="where a trigger is written")
     p = sub.add_parser("watchlist", help="check every hit in trader/watchlist.json")
     common(p)

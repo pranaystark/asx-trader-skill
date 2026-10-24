@@ -2,8 +2,8 @@
 name: trader-scanner
 description: >-
   Chart Scanner. Scans thousands of charts for setups: opening-range
-  breakouts, flags, oversold bounces. Builds the list of US-listed common
-  stocks, ordinary shares and ADRs from Nasdaq Trader's symbol directories,
+  breakouts, flags, oversold bounces. Builds the list of ASX-listed common
+  stocks, ordinary shares and ADRs from ASX's listed-companies file,
   runs a pre-market scan of daily closes (20-day closing-high breakout, bull
   flag, reclaimed the 20-day average, oversold, oversold bounce) and an
   intraday opening-range breakout scan on 5-minute bars, then writes
@@ -29,15 +29,15 @@ the scanner does not change that. It only saves you from flipping through
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scan.py" universe                       # -> trader/universe.txt
 python3 "${CLAUDE_SKILL_DIR}/scan.py" daily                          # before the open -> trader/watchlist.json
-python3 "${CLAUDE_SKILL_DIR}/scan.py" daily --symbols TSLA,NVDA,AMD  # or --watchlist FILE, --limit 200
-python3 "${CLAUDE_SKILL_DIR}/scan.py" orb                            # after 9:50 AM ET -> trader/watchlist.json
-python3 "${CLAUDE_SKILL_DIR}/scan.py" orb --at 10:15                 # cut the clock at 10:15 AM ET
+python3 "${CLAUDE_SKILL_DIR}/scan.py" daily --symbols BHP,CBA,CSL  # or --watchlist FILE, --limit 200
+python3 "${CLAUDE_SKILL_DIR}/scan.py" orb                            # after 9:50 AM AEST -> trader/watchlist.json
+python3 "${CLAUDE_SKILL_DIR}/scan.py" orb --at 10:15                 # cut the clock at 10:15 AM AEST
 python3 "${CLAUDE_SKILL_DIR}/scan.py" orb --watchlist trader/watchlist.json --json
 ```
 
 Flags: `--min-price 5` and `--min-volume` (daily 1,000,000, orb 0),
 `--or-minutes 15`, `--max-confirm 200` (orb stage 2),
-`--now "2026-10-19 10:15"` (New York time) to pin the clock, `--offline PATH`
+`--now "2026-10-19 10:15"` (Sydney time) to pin the clock, `--offline PATH`
 to read saved Yahoo files, `--no-write`, `--show N`, `--json`. Exit code 0
 when the scan found something, 1 when it found nothing or could not run (the
 reason is one plain line).
@@ -52,8 +52,8 @@ reason is one plain line).
 
 ## The universe
 
-`universe` downloads `nasdaqlisted.txt` and `otherlisted.txt` from
-nasdaqtrader.com/dynamic/SymDir and keeps a row when, in this order:
+`universe` downloads the ASX listed-companies file from
+asx.com.au/asx/research/ASXListedCompanies.csv and keeps one row per ASX code.
 
 1. It is not a test issue, not an ETF, not NextShares.
 2. It is a plain ticker: 1 to 5 letters, or 1 to 4 letters plus one class
@@ -101,7 +101,7 @@ listed most traded first (price times volume).
 
 ## The opening-range breakout scan (during the session)
 
-The opening range is the first `--or-minutes` (15) of the session: the 9:30,
+The opening range is the first `--or-minutes` (15) of the session: the 10:00,
 9:35 and 9:40 five-minute bars. A hit is the first completed 5-minute bar
 to CLOSE above the range high, at that bar's close time.
 
@@ -123,7 +123,7 @@ spark requests, then 200 v8 charts): 2,448 usable charts, 1,782 candidates,
 the 200 most traded checked, 119 of those broke out. For a fast answer, scan
 the daily watchlist or a list of names you trade (`--watchlist`, `--symbols`).
 
-A chart is usable only when every 5-minute bar from 9:30 to the cutoff is
+A chart is usable only when every 5-minute bar from 10:00 to the cutoff is
 there; a missing bar means a halt or a thin stock. Null closes are dropped,
 a bar off the 5-minute grid (the live tick, like 10:58:07) is dropped, and a
 bar counts only once it is complete (start + 5 minutes). Before 9:50 AM, on a
@@ -138,14 +138,14 @@ are in the calendar.
   or 5xx, one retry after a 5-second wait on a 429.
 - Partial results are said as partial: "Fetched 4,980 of 5,259 charts (279
   failed or had no data)". Never round a partial scan up to "the whole market".
-- NYSE holidays and early closes for 2026 and 2027 (nyse.com, read 2026-10-13).
+- ASX holidays and early closes for 2026 and 2027 (official ASX trading calendar).
 
 ## Steps
 
 1. Once a week or so: `scan.py universe`.
 2. Before the open: `scan.py daily`. Tell the user the counts (fetched,
    liquid, scanned, hits) and the top few by setup.
-3. After 9:50 AM ET (10:15 is the classic): `scan.py orb`. Tell the user how
+3. After 9:50 AM AEST (10:15 is the classic): `scan.py orb`. Tell the user how
    many usable charts broke their range and when, and that a later hit is
    closer to the price now.
 4. The user picks one chart. Hand it on: `/trader-news TICKER` (what is moving
@@ -162,15 +162,15 @@ Fetched 233 of 234 charts (1 failed or had no data); 231 usable; 95 candidates, 
 42 of 231 charts closed above their opening-range high by 10:15 AM:
    9:50 AM  AMC         $2.97  range 2.90 to 2.96  +0.50% over
   ...
-  10:15 AM  TSLA      $364.18  range 354.47 to 362.18  +0.55% over
+  10:15 AM  BHP      $364.18  range 354.47 to 362.18  +0.55% over
 ```
 
 The reel's wall had no price floor (AMC at $2.97 is one of the 42), hence
-`--min-price 0`; with the default $5 floor it is 41. TSLA's range is the 9:30
+`--min-price 0`; with the default $5 floor it is 41. BHP's range is the 10:00
 to 9:40 bars, high 362.18, low 354.47; the 10:10 bar closed at 364.18, 0.55 %
-over the high, at 10:15 AM. The user picks TSLA and Claude hands it to
-`/trader-news TSLA`, then `/trader-entry TSLA`. In the reel the universe was
-5,259 US stocks; this tool's rule gives 5,943 on the same files.
+over the high, at 10:15 AM. The user picks BHP and your agent hands it to
+`/trader-news BHP`, then `/trader-entry BHP`. In the reel the universe was
+5,259 ASX stocks; this tool's rule gives 5,943 on the same files.
 
 The pre-market scan that morning (closes through Fri Oct 16, the reel's daily
 charts) tags BLK, CI, XOM and HD a 20-day breakout, CCL a bull flag, F, JPM
@@ -197,7 +197,7 @@ never calls data real time, and never promises that a setup works.
 - Paper trading by default (`"paper": true`). Going live is the user's own decision, in their own config.
 - Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk
   passed that exact order today, the user typed an explicit yes for that one order in the chat, and the
-  user clicked Allow once on Claude's own card because the order tool is set to "Needs approval"
+  user clicked Allow once on your agent's own card because the order tool is set to "Needs approval"
   (Customize > Connectors > tool permissions). Never set an order tool to "Always allow".
 - No options, margin, short selling or leverage unless the config allows it and the user confirms.
-- Broker keys live in environment variables or the Claude Desktop config, never in the chat.
+- Broker keys live in environment variables or the your agent app config, never in the chat.

@@ -6,7 +6,7 @@ description: >-
   the whole shares that fit inside four limits (max loss per trade, position
   cap, max order, cash after your buffer), says which limit decided it, and
   writes ONE bracket order (entry, stop-loss, take-profit) to
-  trader/orders.json in the exact shape of Alpaca's place_stock_order. A stop
+  trader/orders.json in the exact shape of your broker's place-order call. A stop
   too far away for your max loss is a plain refusal, not a smaller order.
   Nothing is placed. Use when the user says "how many shares", "size this
   trade", "how much should I buy", "I have $5,000", "I only want to risk $50
@@ -17,7 +17,7 @@ argument-hint: "[budget in dollars]"
 
 # trader-budget
 
-The Budget Manager turns a plan ("buy TSLA at 364.18, stop 358.32") into an
+The Budget Manager turns a plan ("buy BHP at 364.18, stop 358.32") into an
 exact order ("buy 8 shares"), inside rules the user sets once. The stop
 decides the size: the further away the stop, the fewer shares. It writes a
 proposal only. trader-risk checks it and trader-broker asks the user yes or
@@ -31,10 +31,10 @@ python3 "${CLAUDE_SKILL_DIR}/size.py"                        # trader/plan.json 
 python3 "${CLAUDE_SKILL_DIR}/size.py" --write                # write trader/orders.json
 python3 "${CLAUDE_SKILL_DIR}/size.py" --limit --write        # a limit order at the plan's entry
 python3 "${CLAUDE_SKILL_DIR}/size.py" --limit 364.00 --json  # a limit order at 364.00
-python3 "${CLAUDE_SKILL_DIR}/size.py" --weights AAPL=40,KO=60 --config split.json   # weights mode, below
+python3 "${CLAUDE_SKILL_DIR}/size.py" --weights NAB=40,KO=60 --config split.json   # weights mode, below
 ```
 
-`--now "2026-10-19 10:15"` pins the clock (New York time). A plan for
+`--now "2026-10-19 10:15"` pins the clock (Sydney time). A plan for
 another day is refused: make a new one with trader-exit.
 
 ## What it reads and writes
@@ -59,7 +59,7 @@ If `trader/config.json` does not exist, copy `config.example.json` into
   budget), the biggest order ($4,000) and the smallest order ($5).
 - The day limits trader-risk enforces: **max_daily_loss_usd** (150), **max_trades_per_day** (3),
   **min_reward_risk** (1.0), **require_stop** (true), **no_entries_before** / **no_entries_after**
-  ("09:45" / "15:30") and **flat_by** ("15:55"), all New York time.
+  ("09:45" / "15:30") and **flat_by** ("15:55"), all Sydney time.
 - **blocked**: tickers they never want to trade.
 - Keep **paper** true until they have watched it work on a paper account.
 
@@ -69,7 +69,7 @@ If `trader/config.json` does not exist, copy `config.example.json` into
 python3 "${CLAUDE_SKILL_DIR}/size.py" --write
 ```
 
-Whole shares only: Alpaca takes no fractions in a bracket order. The size is
+Whole shares only: your ASX broker takes no fractions in a bracket order. The size is
 the smallest of four limits:
 
 | limit | shares |
@@ -99,7 +99,7 @@ promise: in a fast market it can fill below the stop. Then hand over to
 
 ## Example: the reel
 
-TSLA on Monday 2026-10-19. Opening-range breakout: entry 364.18 at 10:15 AM,
+BHP on Monday 2026-10-19. Opening-range breakout: entry 364.18 at 10:15 AM,
 stop 358.32 (the opening-range midpoint), target 370.04 (1R). Risk 5.86 a
 share. The example config: $5,000 budget, 10% cash buffer, $50 max loss.
 
@@ -113,28 +113,28 @@ share. The example config: $5,000 budget, 10% cash buffer, $50 max loss.
 8 shares = $2,913.44. Max loss at the stop: 8 x 5.86 = $46.88. It writes:
 
 ```json
-{"symbol": "TSLA", "side": "buy", "qty": "8", "type": "market", "time_in_force": "day",
+{"symbol": "BHP", "side": "buy", "qty": "8", "type": "market", "time_in_force": "day",
  "order_class": "bracket", "take_profit_limit_price": "370.04", "stop_loss_stop_price": "358.32",
- "why": "opening-range breakout on TSLA: 8 shares, bound by your $50 max loss per trade (8 x 5.86 = $46.88 at the stop)",
+ "why": "opening-range breakout on BHP: 8 shares, bound by your $50 max loss per trade (8 x 5.86 = $46.88 at the stop)",
  "plan": {"entry": 364.18, "stop": 358.32, "target": 370.04, "risk_per_share": 5.86, "max_loss": 46.88,
           "setup": "orb", "entry_time": "10:15 AM", "flat_by": "15:55"}}
 ```
 
 `why` and `plan` are notes for trader-risk and trader-broker. They are never
-sent to Alpaca. With the stop at 300.00 instead, one share would risk 64.18,
+sent to your ASX broker. With the stop at 300.00 instead, one share would risk 64.18,
 more than the $50 max loss: no order. At 10:52 the real quote was 366.48, so
 the same plan sizes to 6 shares at 8.16 a share, and reward:risk falls to
 0.44: refused, because the move it was waiting for has mostly happened.
 
 ## Weights mode (kept from v1)
 
-`--weights AAPL=22.04,KO=10.86` or `--targets FILE` (`targets.example.json`
+`--weights NAB=22.04,KO=10.86` or `--targets FILE` (`targets.example.json`
 here) splits a budget across a list by weight: the cash buffer comes off the
 top, weights are renormalised to 100, any stock over `max_position_pct` is
 pinned at the cap and its excess shared out, slices under the minimum order
 are dropped, and amounts round to whole dollars so nothing is left idle by
 accident. With `"max_position_pct": 25` and `"fractional": true`, the example
-file gives AAPL $1,250 (capped), AXP $1,119, GOOGL $823, KO $708, BAC $600.
+file gives NAB $1,250 (capped), AXP $1,119, GOOGL $823, KO $708, BAC $600.
 With `"fractional": false` (the example config) it buys whole shares and
 needs prices (`--prices trader/prices.json`). These are plain buys with no stop: trader-risk blocks them while
 `require_stop` is true and counts each one against `max_trades_per_day`. Use
@@ -160,7 +160,7 @@ margin or short positions.
 - Paper trading by default (`"paper": true`). Going live is the user's own decision, in their own config.
 - Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk
   passed that exact order today, the user typed an explicit yes for that one order in the chat, and the
-  user clicked Allow once on Claude's own card because the order tool is set to "Needs approval"
+  user clicked Allow once on your agent's own card because the order tool is set to "Needs approval"
   (Customize > Connectors > tool permissions). Never set an order tool to "Always allow".
 - No options, margin, short selling or leverage unless the config allows it and the user confirms.
-- Broker keys live in environment variables or the Claude Desktop config, never in the chat.
+- Broker keys live in environment variables or the your agent app config, never in the chat.

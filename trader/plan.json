@@ -1,0 +1,28 @@
+{
+  "created_by": "trader-exit",
+  "symbol": "BHP",
+  "side": "buy",
+  "date": "2026-10-23",
+  "setup": "orb",
+  "entry": 55.85,
+  "entry_time": "10:15 AM",
+  "entry_bar": null,
+  "interval": "5m",
+  "opening_range": {
+    "high": 55.78,
+    "low": 55.6,
+    "minutes": 15
+  },
+  "stop": 55.01,
+  "stop_rule": "pct",
+  "stop_label": "1.5% under the entry",
+  "target": 57.53,
+  "target_r": 2.0,
+  "target_label": "2R (two times the risk)",
+  "risk_per_share": 0.84,
+  "reward_risk": 2.0,
+  "flat_by": "15:50",
+  "stop_detail": "$55.85 x (1 - 1.5%) = $55.01225, rounded down",
+  "created_at": "2026-10-24T06:37:31Z",
+  "note": "A stop is a plan, not a guarantee: a gap or a fast market can fill past it."
+}

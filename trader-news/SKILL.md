@@ -3,11 +3,11 @@ name: trader-news
 description: >-
   News Monitor. Tracks breaking news on every stock you watch and flags what
   moves it: Yahoo Finance headlines per ticker, each company's 8-K filings on
-  SEC EDGAR (earnings, CEO changes, deals, restatements, bankruptcy) and how
+  company news (earnings, CEO changes, deals, restatements, bankruptcy) and how
   far each stock is from yesterday's close. Shows only what is new since the
-  last check, newest first, in New York time, tags each item (earnings,
+  last check, newest first, in Sydney time, tags each item (earnings,
   analyst, deal, halt, regulatory, macro...) and never repeats one. Use when
-  the user says "any news on TSLA", "why is this moving", "what's the news on
+  the user says "any news on BHP", "why is this moving", "what's the news on
   my watchlist", "morning briefing", "pre-market news", "monitor the news",
   "did anything break", "check the 8-Ks", or after /trader-scanner finds setups.
 argument-hint: "[tickers]"
@@ -25,7 +25,7 @@ Tool in this folder (standard library Python, no keys):
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/news.py"                         # watchlist + plan + portfolio
-python3 "${CLAUDE_SKILL_DIR}/news.py" --tickers TSLA NVDA --hours 12
+python3 "${CLAUDE_SKILL_DIR}/news.py" --tickers BHP CBA --hours 12
 python3 "${CLAUDE_SKILL_DIR}/news.py" --no-sec --json
 ```
 
@@ -36,9 +36,9 @@ python3 "${CLAUDE_SKILL_DIR}/news.py" --no-sec --json
 | `--tickers`, else `trader/watchlist.json` | the scanner's hits (trader-scanner) |
 | `trader/plan.json` | the trade you are planning (trader-exit) |
 | `trader/portfolio.json` | what you hold (trader-broker records fills there) |
-| Yahoo Finance headline RSS | `https://feeds.finance.yahoo.com/rss/2.0/headline?s=TSLA&region=US&lang=en-US` |
+| Yahoo Finance headline RSS | `https://feeds.finance.yahoo.com/rss/2.0/headline?s=BHP&region=US&lang=en-US` |
 | Yahoo Finance chart endpoint | the last price against yesterday's close (unofficial, can lag) |
-| SEC EDGAR company Atom feed | 8-K by default (`--forms 8-K,10-Q` for more); needs `sec_user_agent` in `trader/config.json` or `SEC_USER_AGENT`, else filings are skipped with a note |
+| company news company Atom feed | 8-K by default (`--forms 8-K,10-Q` for more); needs `sec_user_agent` in `trader/config.json` or `ASX_USER_AGENT`, else filings are skipped with a note |
 | `trader/state/news.json` | what has been shown (kept 30 days) and each ticker's CIK |
 
 ## The rules
@@ -47,7 +47,7 @@ python3 "${CLAUDE_SKILL_DIR}/news.py" --no-sec --json
   happened, open the story or the filing and read it. Quote the source and
   link it. Never summarise a paywalled story you could not read: say so.
 - **Filings beat headlines.** If an 8-K and a headline disagree, the 8-K is
-  what the company told the SEC.
+  what the company told the ASX.
 - **Say what it touches.** Every item lists the tickers it touches and its
   tags: earnings, analyst, legal, deal, capital, people, risk, halt,
   regulatory, macro. Filings marked `!` carry an important 8-K item: earnings
@@ -78,15 +78,15 @@ morning before the open.
 
 ## Example: the reel
 
-Monday 2026-10-19, TSLA broke its opening range at 10:15 AM ET. The check at
-10:15 (Yahoo Finance's TSLA feed, 16 headlines since 8:00) leads with the
+Monday 2026-10-19, BHP broke its opening range at 10:15 AM AEST. The check at
+10:15 (Yahoo Finance's BHP feed, 16 headlines since 8:00) leads with the
 morning's real stories: "Meta and Musk earnings and September pending home
 sales: What to Watch" (8:00, earnings), "Tesla-SpaceX Merger Mania Strikes
 Wall Street Ahead of Earnings" (8:04, earnings, deal), "Tech Stock Rebound
 Nudges US Equity Futures Mostly Higher Pre-Bell" (8:02, macro). The brief:
 "Tesla reports this week, so the stock can gap overnight; today's trade is
 in and out before the close. No new 8-K." At 10:52 the price line reads
-`TSLA 366.48 +3.31% vs yesterday's close 354.72 at 10:52 ET  MOVING`. When a
+`BHP 366.48 +3.31% vs yesterday's close 354.72 at 10:52 AEST  MOVING`. When a
 ticker has no news, say so rather than padding the brief.
 
 ## What it never does
@@ -95,7 +95,7 @@ ticker has no news, say so rather than padding the brief.
 - Never trades on news, and never tells the user to buy or sell because of a
   headline.
 - Never hammers a server: one request per feed per ticker, a pause between
-  calls, and SEC's 10 requests a second limit stays far away.
+  calls, and ASX's 10 requests a second limit stays far away.
 
 ## Safety
 

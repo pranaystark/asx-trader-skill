@@ -6,8 +6,8 @@ prints only what is new since the last check, newest first, with how far each
 stock has moved today and a flag on anything that touches your tickers.
 
     python3 news.py                                  # watchlist + plan + portfolio tickers
-    python3 news.py --tickers TSLA NVDA AMD
-    python3 news.py --tickers TSLA --all --hours 72  # everything in the last 3 days, seen or not
+    python3 news.py --tickers BHP CBA CSL
+    python3 news.py --tickers BHP --all --hours 72  # everything in the last 3 days, seen or not
     python3 news.py --no-sec                         # headlines only
     python3 news.py --no-moves                       # skip the price line per ticker
 
@@ -17,7 +17,7 @@ positions in trader/portfolio.json.
 
 Sources, one request each per ticker:
   - Yahoo Finance headline RSS:
-    https://feeds.finance.yahoo.com/rss/2.0/headline?s=<TICKER>&region=US&lang=en-US
+    https://feeds.finance.yahoo.com/rss/2.0/headline?s=<TICKER>&region=AU&lang=en-AU
   - SEC EDGAR filings Atom feed for the company (8-K by default: earnings,
     executive changes, deals, restatements):
     https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=<CIK>&type=8-K&count=10&output=atom
@@ -29,7 +29,7 @@ Sources, one request each per ticker:
     price against yesterday's close:
     https://query2.finance.yahoo.com/v8/finance/chart/<TICKER>?range=1d&interval=5m
 
-Times print in New York time (ET). State: trader/state/news.json remembers
+Times print in Sydney time (AEST/AEDT). State: trader/state/news.json remembers
 what you have seen (30 days), so an item shows once. Offline: --offline DIR
 reads yahoo-<TICKER>.xml, chart-<TICKER>.json, sec-<FORM>-<CIK>.xml and
 company_tickers.json from DIR. The tests use it.
@@ -50,9 +50,9 @@ import sys
 import time
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as AEST
 
-YAHOO = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US"
+YAHOO = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=AU&lang=en-AU"
 CHART = "https://%s.finance.yahoo.com/v8/finance/chart/%s?range=1d&interval=5m"
 SEC_FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s&type=%s"
             "&dateb=&owner=include&count=%d&output=atom")
@@ -94,26 +94,32 @@ class NewsError(Exception):
 
 # ---------------------------------------------------------------- time
 
-def _nth_sunday(year, month, n):
+def _first_sunday(year, month):
     d = _dt.date(year, month, 1)
     d += _dt.timedelta(days=(6 - d.weekday()) % 7)
-    return d + _dt.timedelta(weeks=n - 1)
+    return d
 
 
-def eastern_offset(utc):
-    """Hours from UTC for New York: -4 in daylight time, -5 otherwise (US rule since 2007)."""
+def sydney_offset(utc):
+    """Hours from UTC for Sydney: +11 in daylight time (AEDT), +10 otherwise (AEST).
+    DST runs from 2:00 a.m. on the first Sunday of October to 3:00 a.m. on the
+    first Sunday of April (Australian rule)."""
     y = utc.year
-    start = _dt.datetime.combine(_nth_sunday(y, 3, 2), _dt.time(7, 0))   # 2:00 EST
-    end = _dt.datetime.combine(_nth_sunday(y, 11, 1), _dt.time(6, 0))    # 2:00 EDT
     naive = utc.replace(tzinfo=None)
-    return -4 if start <= naive < end else -5
+    start = _dt.datetime.combine(_first_sunday(y, 10) - _dt.timedelta(days=1), _dt.time(16, 0))  # 02:00 AEST
+    end = _dt.datetime.combine(_first_sunday(y, 4) - _dt.timedelta(days=1), _dt.time(16, 0))    # 03:00 AEDT
+    if naive >= start:      # Oct-Dec: DST (ends next April)
+        return 11
+    if naive < end:         # Jan-Mar and early April: DST
+        return 11
+    return 10
 
 
-def to_eastern(utc):
-    """Aware or naive UTC -> naive New York wall-clock time."""
+def to_sydney(utc):
+    """Aware or naive UTC -> naive Sydney wall-clock time."""
     if utc.tzinfo is not None:
         utc = utc.astimezone(_dt.timezone.utc)
-    return utc.replace(tzinfo=None) + _dt.timedelta(hours=eastern_offset(utc))
+    return utc.replace(tzinfo=None) + _dt.timedelta(hours=sydney_offset(utc))
 
 
 # ---------------------------------------------------------------- inputs
@@ -192,7 +198,8 @@ class Fetcher(object):
 
 
 def yahoo_symbol(ticker):
-    return ticker.upper().replace(".", "-")
+    s = ticker.upper()
+    return s if s.endswith(".AX") else s + ".AX"
 
 
 def cik_map(fetcher, state):
@@ -241,8 +248,8 @@ def parse_time(value):
 def parse_rss(data, ticker):
     """Yahoo headline RSS -> items."""
     try:
-        root = ET.fromstring(data)
-    except ET.ParseError as exc:
+        root = AEST.fromstring(data)
+    except AEST.ParseError as exc:
         raise NewsError("RSS for %s is not valid XML: %s" % (ticker, exc))
     out = []
     for it in root.iter("item"):
@@ -258,8 +265,8 @@ def parse_rss(data, ticker):
 def parse_sec_atom(data, ticker):
     """EDGAR company filings Atom -> items."""
     try:
-        root = ET.fromstring(data)
-    except ET.ParseError as exc:
+        root = AEST.fromstring(data)
+    except AEST.ParseError as exc:
         raise NewsError("SEC feed for %s is not valid XML: %s" % (ticker, exc))
     company = ""
     for el in root.iter():
@@ -328,7 +335,7 @@ def mention_patterns(watch):
     pats = {}
     for t, name in watch.items():
         alts = [r"\(%s\)" % re.escape(t), r"\$%s\b" % re.escape(t),
-                r"\b(?:NYSE|NASDAQ|Nasdaq)\s*:\s*%s\b" % re.escape(t)]
+                r"\bASX\s*:\s*%s\b" % re.escape(t)]
         if name and len(name) >= 4:
             alts.append(r"\b%s\b" % re.escape(name).replace(r"\ ", r"[\s-]"))
         pats[t] = re.compile("|".join(alts))
@@ -439,7 +446,7 @@ def render_moves(moves, move_pct=MOVE_PCT):
     out = []
     for m in moves:
         flag = "MOVING" if abs(m["pct"]) >= move_pct else ""
-        when = (" at %s ET" % to_eastern(m["time"]).strftime("%H:%M")) if m.get("time") else ""
+        when = (" at %s AEST" % to_sydney(m["time"]).strftime("%H:%M")) if m.get("time") else ""
         out.append("%-6s %s %+.2f%% vs yesterday's close %s%s  %s" % (
             m["ticker"], "{:,.2f}".format(m["price"]), m["pct"], "{:,.2f}".format(m["prev_close"]),
             when, flag))
@@ -453,7 +460,7 @@ def render(items, errors, now, moves=None, move_pct=MOVE_PCT):
     if not items:
         out.append("Nothing new.")
     for it in items:
-        when = to_eastern(it["time"]).strftime("%Y-%m-%d %H:%M ET") if it["time"] else "time unknown"
+        when = to_sydney(it["time"]).strftime("%Y-%m-%d %H:%M AEST") if it["time"] else "time unknown"
         mark = "!" if it.get("important") else " "
         who = ",".join(it["touches"]) or it["ticker"]
         out.append("%s %s  %-11s %-13s %s" % (mark, when, who, it["source"], it["title"]))
@@ -465,7 +472,7 @@ def render(items, errors, now, moves=None, move_pct=MOVE_PCT):
     for e in errors:
         out.append("note: %s" % e)
     out.append("Checked %s. Headlines are leads, not facts; open the story before acting. "
-               "Not financial advice." % to_eastern(now).strftime("%Y-%m-%d %H:%M ET"))
+               "Not financial advice." % to_sydney(now).strftime("%Y-%m-%d %H:%M AEST"))
     return "\n".join(out) + "\n"
 
 

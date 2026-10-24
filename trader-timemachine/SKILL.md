@@ -34,14 +34,14 @@ python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run                    # trader/pla
 python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run --write            # also save trader/timemachine.json
 python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run --until 15:55      # end each replay at your flat-by time
 python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run --json
-python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run --symbol TSLA --date 2026-10-19 \
+python3 "${CLAUDE_SKILL_DIR}/timemachine.py" run --symbol BHP --date 2026-10-19 \
     --entry 364.18 --stop 358.32 --target 370.04 --entry-time "10:15 AM"
 python3 "${CLAUDE_SKILL_DIR}/timemachine.py" chart --from           # ASCII fan chart of the saved run
 ```
 
 Other flags: `--replays N`, `--seed N` (default 19), `--window N` (default 2
 bars), `--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`),
-`--now "2026-10-19 10:15"` (New York time) to pin the clock.
+`--now "2026-10-19 10:15"` (Sydney time) to pin the clock.
 
 ## What it reads and writes
 
@@ -54,7 +54,7 @@ bars), `--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`),
 ## How it works
 
 1. **The pool.** It keeps only FULL sessions before the plan's date: all 78
-   five-minute bars, 9:30 to 4:00 New York time. Half days, gaps and today
+   five-minute bars, 10:00 to 4:00 Sydney time. Half days, gaps and today
    are left out. Every bar becomes four ratios to the bar before it:
    open, high, low and close over the previous close.
 2. **One replay.** Start at the entry price. For each bar left in the day,
@@ -63,7 +63,7 @@ bars), `--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`),
    first, then the target. A bar that touches both counts as the stop.
 3. **10,000 replays** give four odds. Target first. Stop first. Neither,
    which means the trade was still open at `--until` (default 4:00 PM, the
-   close, or 1:00 PM on an NYSE early-close day). Green, which means target
+   close, or 1:00 PM on an ASX early-close day). Green, which means target
    first or above the entry at `--until`.
    R is +1 at a 1R target, -1 at the stop, and otherwise the distance from
    the entry at `--until` divided by the risk. A gap through the stop still
@@ -114,7 +114,7 @@ grid). A live in-progress bar is never used.
 
 ## Example: the reel
 
-TSLA, Monday 2026-10-19. The 15-minute opening range is 354.47 to 362.18.
+BHP, Monday 2026-10-19. The 15-minute opening range is 354.47 to 362.18.
 The 10:10 bar closes above it: entry 364.18 at 10:15 AM (bar 8), stop 358.32
 (the range midpoint, rounded down), target 370.04 (1R, risk 5.86 a share).
 
@@ -162,7 +162,7 @@ into the pool.
 - Paper trading by default (`"paper": true`). Going live is the user's own decision, in their own config.
 - Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk
   passed that exact order today, the user typed an explicit yes for that one order in the chat, and the
-  user clicked Allow once on Claude's own card because the order tool is set to "Needs approval"
+  user clicked Allow once on your agent's own card because the order tool is set to "Needs approval"
   (Customize > Connectors > tool permissions). Never set an order tool to "Always allow".
 - No options, margin, short selling or leverage unless the config allows it and the user confirms.
-- Broker keys live in environment variables or the Claude Desktop config, never in the chat.
+- Broker keys live in environment variables or the your agent app config, never in the chat.

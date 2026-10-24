@@ -32,7 +32,7 @@ keep each loss and each day's losses small. They do not make a trade win.
 python3 "${CLAUDE_SKILL_DIR}/check.py"                           # trader/ files; writes trader/state/risk.json
 python3 "${CLAUDE_SKILL_DIR}/check.py" --json
 python3 "${CLAUDE_SKILL_DIR}/check.py" --no-write                # look without recording
-python3 "${CLAUDE_SKILL_DIR}/check.py" --now "2026-10-19 10:15"  # pin the clock (New York time)
+python3 "${CLAUDE_SKILL_DIR}/check.py" --now "2026-10-19 10:15"  # pin the clock (Sydney time)
 ```
 
 ## What it reads and writes
@@ -61,7 +61,7 @@ batch that is fine order by order but breaks a limit together is caught.
 
 | check | blocks when |
 | --- | --- |
-| format | no symbol, side not buy or sell, both or neither of qty and notional, a notional order that is not market + day (Alpaca's rule), a limit order with no limit price; a bracket that is not whole shares, not `day` or `gtc`, or misses its stop-loss or take-profit |
+| format | no symbol, side not buy or sell, both or neither of qty and notional, a notional order that is not market + day (your broker's rule), a limit order with no limit price; a bracket that is not whole shares, not `day` or `gtc`, or misses its stop-loss or take-profit |
 | asset | an option symbol while `allow_options` is false; crypto or anything that is not a US stock or ETF ticker |
 | short | a sell of more than you hold (`allow_short` false) |
 | blocked | (entries) the ticker is on the `blocked` list |
@@ -87,8 +87,8 @@ How the numbers work:
   used, and it says so.
 - **Daily loss** counts the full max loss of every entry placed today, win or
   lose, as trader-broker logged it. Three full-size trades use up a $150 day.
-- **The window** is New York time, worked out in the tool (daylight saving
-  included), never from the computer's clock zone. Weekends and NYSE holidays
+- **The window** is Sydney time, worked out in the tool (daylight saving
+  included), never from the computer's clock zone. Weekends and ASX holidays
   are closed. On a 1:00 p.m. early close the window ends 3 hours earlier too.
   Set both `no_entries_*` to null to switch the window off.
 - **pdt_guard** (off by default) counts a day trade as a symbol bought and
@@ -105,7 +105,7 @@ not at the broker, a price too old to use, an early close today.
 ## Steps
 
 1. If the price may have moved since the plan, refresh it first
-   (trader-alerts: `alerts.py quote TSLA --write`).
+   (trader-alerts: `alerts.py quote BHP --write`).
 2. Run `check.py`. Exit code 0 means every order passed, 1 means at least one
    was blocked.
 3. Tell the user the result in plain words, order by order: the max loss at
@@ -119,22 +119,22 @@ not at the broker, a price too old to use, an early close today.
 
 ## Example: the reel
 
-The TSLA bracket from trader-budget at 10:15 AM on Monday 2026-10-19, on a
+The BHP bracket from trader-budget at 10:15 AM on Monday 2026-10-19, on a
 fresh $5,000 paper account with the example config:
 
 ```
-PASS  #1 buy TSLA 8 shares, entry
+PASS  #1 buy BHP 8 shares, entry
           entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share
           max loss $46.88 (limit $50), reward:risk 1.00 (min 1)
           today before this: 0 of 3 trades, $0 of $150 daily loss
 
-1 passed, 0 blocked at 2026-10-19 10:15 New York. Cash after the passed orders: $2,086.56 (paper account).
+1 passed, 0 blocked at 2026-10-19 10:15 Sydney. Cash after the passed orders: $2,086.56 (paper account).
 ```
 
 One more share and it is blocked:
 
 ```
-BLOCK #1 buy TSLA 9 shares, entry
+BLOCK #1 buy BHP 9 shares, entry
           entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share
           max loss $52.74 (limit $50), reward:risk 1.00 (min 1)
           today before this: 0 of 3 trades, $0 of $150 daily loss
@@ -166,7 +166,7 @@ treats a PASS as the user's yes.
 - Paper trading by default (`"paper": true`). Going live is the user's own decision, in their own config.
 - Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk
   passed that exact order today, the user typed an explicit yes for that one order in the chat, and the
-  user clicked Allow once on Claude's own card because the order tool is set to "Needs approval"
+  user clicked Allow once on your agent's own card because the order tool is set to "Needs approval"
   (Customize > Connectors > tool permissions). Never set an order tool to "Always allow".
 - No options, margin, short selling or leverage unless the config allows it and the user confirms.
-- Broker keys live in environment variables or the Claude Desktop config, never in the chat.
+- Broker keys live in environment variables or the your agent app config, never in the chat.
