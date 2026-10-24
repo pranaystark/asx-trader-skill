@@ -49,8 +49,8 @@ What blocks an entry (on top):
   trades        max_trades_per_day entries already placed today
   window        before no_entries_before or after no_entries_after (Sydney
                 time), or the market is closed (weekend, ASX holiday, outside
-                10:00 to the close; on a 1:00 p.m. early close the window ends
-                3 hours earlier too)
+                10:00 to the close; on a 2:10 p.m. early close the window ends
+                1h50m earlier too)
   pdt           only with "pdt_guard": true: 3 day trades already in the last
                 5 business days (a 4th would trip the old pattern-day-trader rule)
 
@@ -205,8 +205,13 @@ def hhmm(value, key):
     return datetime.time(int(m.group(1)), int(m.group(2)))
 
 
-def _shift(t, hours):
-    dt = datetime.datetime.combine(datetime.date(2000, 1, 1), t) - datetime.timedelta(hours=hours)
+def _early_shift_minutes():
+    """Minutes the ASX session ends early on an early-close day (16:00 - 14:10 = 110)."""
+    return (CLOSE.hour * 60 + CLOSE.minute) - (EARLY.hour * 60 + EARLY.minute)
+
+
+def _shift_min(t, minutes):
+    dt = datetime.datetime.combine(datetime.date(2000, 1, 1), t) - datetime.timedelta(minutes=minutes)
     return dt.time()
 
 
@@ -230,8 +235,8 @@ def window_check(now_et, c):
         return ["window: the market is closed (%s Sydney; the session is %s to %s)"
                 % (stamp, OPEN.strftime("%H:%M"), close.strftime("%H:%M"))], warns
     if close == EARLY and after is not None:
-        after = _shift(after, 3)
-        warns.append("early close at 1:00 p.m. today (%s): no new entries after %s"
+        after = _shift_min(after, _early_shift_minutes())
+        warns.append("early close at 2:10 p.m. today (%s): no new entries after %s"
                      % (ASX_EARLY_CLOSE[d.isoformat()], after.strftime("%H:%M")))
     if before is not None and t < before:
         return ["window: no new entries before %s Sydney (it is %s)" % (before.strftime("%H:%M"),

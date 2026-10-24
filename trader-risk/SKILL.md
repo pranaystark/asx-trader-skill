@@ -89,7 +89,7 @@ How the numbers work:
   lose, as trader-broker logged it. Three full-size trades use up a $150 day.
 - **The window** is Sydney time, worked out in the tool (daylight saving
   included), never from the computer's clock zone. Weekends and ASX holidays
-  are closed. On a 1:00 p.m. early close the window ends 3 hours earlier too.
+  are closed. On a 2:10 p.m. early close the window ends 1h50m earlier too.
   Set both `no_entries_*` to null to switch the window off.
 - **pdt_guard** (off by default) counts a day trade as a symbol bought and
   sold on the same day in the log, plus any entry placed today (it is meant

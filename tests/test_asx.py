@@ -121,5 +121,36 @@ class ImportAll(unittest.TestCase):
                 load(name, rel)
 
 
+alerts = load("asx_alerts", "trader-alerts/alerts.py")
+risk = load("asx_risk", "trader-risk/check.py")
+
+
+class EarlyClose(unittest.TestCase):
+    """The ASX early close is 14:10 (1h50m before the 16:00 close), not the US 3 hours."""
+
+    def setUp(self):
+        self.status = alerts.market_status(datetime.datetime(2026, 12, 24, 3, 0))  # 14:00 Sydney
+
+    def test_early_close_day_is_open_until_1410(self):
+        self.assertEqual(self.status["early_close"], "Christmas Eve")
+        self.assertTrue(self.status["open"])
+
+    def test_before_close_rule_shifts_110_minutes(self):
+        self.assertEqual(alerts.ring_time({"at": "15:55", "before_close": True}, self.status), T(14, 5))
+
+    def test_plain_rule_never_shifts(self):
+        # trader-exit already resolved flat_by for the day; the plan alert must not shift twice
+        self.assertEqual(alerts.ring_time({"at": "14:05"}, self.status), T(14, 5))
+
+    def test_normal_day_does_not_shift(self):
+        st = alerts.market_status(datetime.datetime(2026, 10, 23, 3, 0))
+        self.assertIsNone(st["early_close"])
+        self.assertEqual(alerts.ring_time({"at": "15:55", "before_close": True}, st), T(15, 55))
+
+    def test_risk_window_uses_the_same_delta(self):
+        self.assertEqual(risk._early_shift_minutes(), 110)
+        self.assertEqual(risk._shift_min(datetime.time(15, 30), risk._early_shift_minutes()), T(13, 40))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

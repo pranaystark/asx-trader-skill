@@ -2,8 +2,8 @@
 name: trader-scanner
 description: >-
   Chart Scanner. Scans thousands of charts for setups: opening-range
-  breakouts, flags, oversold bounces. Builds the list of ASX-listed common
-  stocks, ordinary shares and ADRs from ASX's listed-companies file,
+  breakouts, flags, oversold bounces. Builds the list of ASX-listed stocks
+  from ASX's listed-companies file,
   runs a pre-market scan of daily closes (20-day closing-high breakout, bull
   flag, reclaimed the 20-day average, oversold, oversold bounce) and an
   intraday opening-range breakout scan on 5-minute bars, then writes

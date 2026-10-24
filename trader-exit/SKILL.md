@@ -67,8 +67,8 @@ A level setup has no opening range to lean on, so it needs a stop you name.
   spread, normal wiggle would stop you out. An entry.json that has not
   triggered (unless you give `--entry`). A short: v2 plans longs only.
 - **Flat by.** 15:55 by default (or `flat_by` in the config). Out by then,
-  win or lose, no overnight hold. On a 1:00 p.m. early close it moves up to
-  12:55. An entry at or after the flat-by time is refused.
+  win or lose, no overnight hold. On a 2:10 p.m. early close it moves up to
+  14:05. An entry at or after the flat-by time is refused.
 
 ## Steps
 

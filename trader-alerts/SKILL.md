@@ -6,8 +6,8 @@ description: >-
   by close" at your flat-by time), plus above / below / stop / target levels,
   percent moves from the previous close, any time of day, and the ASX
   opening bell, each ringing once so you are not spammed. Knows ASX hours
-  with the 2026 and 2027 holidays and 1:00 p.m. early closes, works out New
-  York time itself, fetches free delayed quotes (Yahoo chart JSON, Stooq
+  with the 2026 and 2027 holidays and 2:10 p.m. early closes, works out
+  Sydney time itself, fetches free delayed quotes (Yahoo chart JSON, Stooq
   CSV) one ticker at a time, and writes trader/prices.json for sizing and the
   risk check. Use when the user says "alert me when", "tell me if BHP hits",
   "watch my stop", "watch my trade", "remind me to close by 3:55", "is the
@@ -66,8 +66,8 @@ reads saved quote files instead of the network.
 
 A rule with `"date"` is watched on that Sydney date only; `--from-plan`
 rules carry the plan's date, so yesterday's stop never rings today. A `time`
-rule with `"before_close": true` moves 3 hours earlier on a 1:00 p.m. early
-close, so "flat by close" at 15:55 rings at 12:55 on those days.
+rule with `"before_close": true` moves up 1h50m on a 2:10 p.m. early
+close, so "flat by close" at 15:55 rings at 14:05 on those days.
 
 ## Quotes
 
@@ -75,7 +75,7 @@ close, so "flat by close" at 15:55 rings at 12:55 on those days.
   unofficial free JSON endpoint, one request per ticker, half a second apart.
   On a 429 it waits and tries once more; on a 429 or a 5xx after that it
   tries `query1`. It identifies itself as `day-trader-skill/2.0`.
-- `stooq`: `stooq.com/q/l/?s=tsla.us&f=sd2t2ohlcv&h&e=csv`, Stooq's free CSV.
+- `stooq`: `stooq.com/q/l/?s=bhp.au&f=sd2t2ohlcv&h&e=csv`, Stooq's free CSV.
   It answered 404 on 2026-10-13; the parser stays for when it is back.
 - Free quotes are unofficial, delayed and can lag. They are fine for alerts
   and for checking a size, not for timing an order. The broker's price is the
@@ -90,12 +90,13 @@ close, so "flat by close" at 15:55 rings at 12:55 on those days.
 Regular session 10:00 a.m. to 4:00 p.m. Sydney time, closed on weekends and
 on these holidays (official ASX trading calendar):
 
-- 2026: Jan 1, Jan 19, Feb 16, Apr 3 (Good Friday), May 25, Jun 19, Jul 3
-  (Independence Day observed), Sep 7, Nov 26, Dec 25. Early close 1:00 p.m. on
-  Nov 27 and Dec 24.
-- 2027: Jan 1, Jan 18, Feb 15, Mar 26 (Good Friday), May 31, Jun 18
-  (Juneteenth observed), Jul 5 (Independence Day observed), Sep 6, Nov 25,
-  Dec 24 (Christmas observed). Early close 1:00 p.m. on Nov 26.
+- 2026: Jan 1 (New Year), Jan 26 (Australia Day), Apr 3 (Good Friday),
+  Apr 6 (Easter Monday), Jun 8 (King's Birthday), Dec 25 (Christmas),
+  Dec 28 (Boxing Day observed). Early close 2:10 p.m. on Dec 24 and Dec 31.
+- 2027: Jan 1 (New Year), Jan 26 (Australia Day), Mar 26 (Good Friday),
+  Mar 29 (Easter Monday), Apr 26 (ANZAC Day observed), Jun 14 (King's
+  Birthday), Dec 27 (Christmas observed), Dec 28 (Boxing Day observed).
+  Early close 2:10 p.m. on Dec 24 and Dec 31.
 
 Daylight saving time is worked out in the tool, so it needs no time zone
 files and ignores the computer's own zone. For any other year it says the

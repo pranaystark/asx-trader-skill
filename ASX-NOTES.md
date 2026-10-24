@@ -37,8 +37,13 @@ scanner, news, entry, exit, timemachine, budget, risk, broker, alerts.
   rate-limit. Delayed quotes are not a trading signal.
 - **Not modelled:** CGT/franking, T+2 settlement, corporate actions, AUD vs the
   US-tools' origin. All amounts are AUD; the tool prints `$` without a label.
-- **News:** headlines/moves come from Yahoo AU. The SEC/EDGAR filing lookup is
-  US-only and is skipped for ASX.
+- **News:** headlines/moves come from Yahoo AU; company news comes from each
+  company's ASX announcements feed
+  (`asx.api.markitdigital.com/asx-research/1.0/companies/<CODE>/announcements`),
+  free and key-less, with the filing PDF at `.../1.0/file/<documentKey>`.
+- **Early close is 1h50m, not 3h.** The ASX stops normal trading at 14:10 on
+  24 & 31 Dec, so the flat-by and the risk window move up by 110 minutes
+  (15:55 -> 14:05), not by the US 3 hours.
 - Market clock for any date: `python3 trader-alerts/alerts.py clock --now "YYYY-MM-DD HH:MM"`.
 
 ## First run

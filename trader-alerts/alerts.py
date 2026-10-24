@@ -23,8 +23,8 @@ Rule types:
   opening_bell    the ASX opened today (rings once per trading day)
   time            the Sydney clock passed "at" (HH:MM) on a trading day
                   (rings once per trading day); "before_close": true moves it
-                  3 hours earlier on a 1:00 p.m. early close, so a 15:55
-                  "flat by close" rings at 12:55 on those days
+                  up 1h50m on a 2:10 p.m. early close, so a 15:55
+                  "flat by close" rings at 14:05 on those days
 
 A rule with "date" is only watched on that Sydney date (rules from a plan
 are for the plan's day only). An above / below alert rings ONCE and then stays
@@ -35,12 +35,13 @@ Quotes (free, delayed, unofficial; for alerts only, never for timing an order):
   yahoo   https://query2.finance.yahoo.com/v8/finance/chart/BHP (falls back to
           query1 on a 429 or a 5xx; one retry with a pause on a 429; one
           request per ticker, half a second apart; the default)
-  stooq   https://stooq.com/q/l/?s=tsla.au&f=sd2t2ohlcv&h&e=csv (Stooq's free
+  stooq   https://stooq.com/q/l/?s=bhp.au&f=sd2t2ohlcv&h&e=csv (Stooq's free
           CSV; it answered 404 on 2026-10-13, kept for when it is back)
   --offline DIR reads DIR/<source>-<TICKER>.json|csv (or .json.gz) instead.
 
-ASX calendar: the 2026 and 2027 holidays and 1:00 p.m. early closes as
-published at https://www.asx.com.au/markets/hours-calendars (read 2026-10-13).
+ASX calendar: the 2026 and 2027 holidays and 2:10 p.m. early closes as
+published at https://www.asx.com.au/markets/market-resources/trading-hours-calendar
+(read 2026-10-24).
 Outside those years the clock says the holiday list is unknown.
 """
 
@@ -90,6 +91,16 @@ CALENDAR_YEARS = (2026, 2027)
 OPEN = datetime.time(10, 0)
 CLOSE = datetime.time(16, 0)
 EARLY = datetime.time(14, 10)
+
+
+def _early_shift_minutes():
+    """Minutes the ASX session ends early on an early-close day (16:00 - 14:10 = 110)."""
+    return (CLOSE.hour * 60 + CLOSE.minute) - (EARLY.hour * 60 + EARLY.minute)
+
+
+def _shift_min(t, minutes):
+    return (datetime.datetime.combine(datetime.date(2000, 1, 1), t)
+            - datetime.timedelta(minutes=minutes)).time()
 
 
 class AlertError(Exception):
@@ -167,7 +178,7 @@ def market_status(now_utc):
     local = to_sydney(now_utc)
     d = local.date()
     ok, reason = trading_day(d)
-    st = {"now_new_york": local.strftime("%Y-%m-%d %H:%M"), "date": d.isoformat(),
+    st = {"now_sydney": local.strftime("%Y-%m-%d %H:%M"), "date": d.isoformat(),
           "weekday": local.strftime("%A"), "calendar_known": d.year in CALENDAR_YEARS,
           "open": False, "reason": reason, "early_close": ASX_EARLY_CLOSE.get(d.isoformat())}
     s = session(d)
@@ -418,10 +429,10 @@ def _rang_today(stamp, today):
 
 
 def ring_time(rule, status):
-    """The time a time rule rings today, moved 3 hours earlier on an early close if "before_close"."""
+    """The time a time rule rings today, moved up by the early-close difference if "before_close"."""
     at = _hhmm(rule.get("at"))
     if rule.get("before_close") and status.get("early_close"):
-        at = (datetime.datetime.combine(datetime.date(2000, 1, 1), at) - datetime.timedelta(hours=3)).time()
+        at = _shift_min(at, _early_shift_minutes())
     return at
 
 
@@ -442,7 +453,7 @@ def evaluate(rules, quotes, status, state, now_utc):
         if typ == "opening_bell":
             if status["open"] and not _rang_today(rung.get(rid), today):
                 rings.append({"id": rid, "symbol": "", "message": "Opening bell: the ASX is open (%s Sydney)%s."
-                              % (status["now_new_york"], (", early close at 1:00 p.m. today, "
+                              % (status["now_sydney"], (", early close at 2:10 p.m. today, "
                                                           + status["early_close"]) if status.get("early_close") else "")})
                 rung[rid] = stamp
             continue
@@ -513,8 +524,10 @@ def rules_from_plan(plan, cfg_flat_by=None):
     flat = plan.get("flat_by") or cfg_flat_by or "15:55"
     if _hhmm(flat) is None:
         raise AlertError("the plan's flat_by %r is not a time like 15:55" % flat)
+    # trader-exit already moved flat_by up for the plan day's early close, so
+    # before_close stays off here or the alert would shift the time twice.
     out.append({"id": "%s-flat-by" % sym.lower(), "symbol": sym, "type": "time", "at": flat,
-                "label": "flat by close", "before_close": True})
+                "label": "flat by close"})
     if plan.get("date"):
         for r in out:
             r["date"] = str(plan["date"])
@@ -547,7 +560,7 @@ def cmd_clock(a):
     if a.json:
         print(json.dumps(st, indent=2))
     else:
-        print("Sydney %s (%s): ASX %s, %s." % (st["now_new_york"], st["weekday"],
+        print("Sydney %s (%s): ASX %s, %s." % (st["now_sydney"], st["weekday"],
                                                   "OPEN" if st["open"] else "closed", st["reason"]))
         if st.get("opens"):
             print("Today's session: %s to %s%s." % (st["opens"], st["closes"],
@@ -605,7 +618,7 @@ def cmd_check(a):
         print(json.dumps({"market": status, "rings": rings, "errors": errors,
                           "quotes": {s: q["price"] for s, q in quotes.items()}}, indent=2))
     else:
-        print("ASX %s (%s Sydney, %s)." % ("OPEN" if status["open"] else "closed", status["now_new_york"],
+        print("ASX %s (%s Sydney, %s)." % ("OPEN" if status["open"] else "closed", status["now_sydney"],
                                               status["reason"]))
         for r in rings:
             print("ALERT " + r["message"])
@@ -759,7 +772,7 @@ def main(argv=None):
     p.add_argument("--config", default="trader/config.json", help="flat_by when the plan has none")
     p.add_argument("--label", help="what a time alert says, e.g. \"flat by close\"")
     p.add_argument("--before-close", action="store_true",
-                   help="a time alert that moves 3 hours earlier on a 1:00 p.m. early close")
+                   help="a time alert that moves up 1h50m on a 2:10 p.m. early close")
     p.add_argument("--date", help="watch this rule on this Sydney date only (YYYY-MM-DD)")
     p.add_argument("--direction", choices=["up", "down"])
     p.add_argument("--rearm", action="store_true")

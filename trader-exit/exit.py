@@ -30,7 +30,7 @@ entry.json that has not triggered (unless you give --entry), a short (v2
 plans longs only).
 
 flat_by (default 15:55, or "flat_by" in trader/config.json): out by then, win
-or lose. On a 1:00 p.m. early close it moves up with the close (12:55).
+or lose. On a 2:10 p.m. early close it moves up with the close (14:05).
 "min_reward_risk" in the config (default 1.0) only warns here; trader-risk
 enforces it.
 
@@ -505,7 +505,7 @@ def read_config(path):
 
 
 def resolve_flat_by(day, explicit, cfg, entry_time):
-    """(HH:MM, note). The config's flat-by moves up with a 1:00 p.m. early close."""
+    """(HH:MM, note). The config's flat-by moves up with a 2:10 p.m. early close."""
     t = parse_hhmm(explicit or cfg.get("flat_by") or DEFAULTS["flat_by"], "--flat-by" if explicit else "flat_by")
     note = ""
     s = session(day) if day else None
@@ -519,7 +519,7 @@ def resolve_flat_by(day, explicit, cfg, entry_time):
             if moved.time() <= OPEN:
                 raise PlanError("flat_by %s in the config is at or after the close" % hm(t))
             t = moved.time()
-            note = "moved up for the 1:00 p.m. early close (%s)" % ASX_EARLY_CLOSE.get(day.isoformat(), "")
+            note = "moved up for the 2:10 p.m. early close (%s)" % ASX_EARLY_CLOSE.get(day.isoformat(), "")
     if entry_time and entry_time >= t:
         raise PlanError("the entry at %s is at or after your flat-by %s: there is no time left to hold it"
                         % (ampm(entry_time), hm(t)))

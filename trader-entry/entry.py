@@ -27,7 +27,7 @@ once it has closed: now >= its start + the interval.
 
 Statuses: triggered; waiting (not open yet, range still forming, or no close
 above the level yet); expired (no trigger by no_entries_after, default 15:30;
-on a 1:00 p.m. early close the cutoff moves up three hours with the close);
+on a 2:10 p.m. early close the cutoff moves up with the close);
 no-data (the market is closed today or Yahoo sent no bars).
 
 trader/config.json (optional): "no_entries_before" (09:45) and
@@ -397,7 +397,7 @@ def r2(x):
 
 def early_cutoff(day, t, close_dt):
     """A cutoff on an early-close day moves up with the close: 15:30 (30 minutes
-    before a 16:00 close) becomes 12:30 before a 1:00 p.m. close. A cutoff that
+    before a 16:00 close) becomes 13:40 before a 2:10 p.m. close. A cutoff that
     is already before the early close stays."""
     at = datetime.datetime.combine(day, t)
     if at < close_dt:
@@ -535,7 +535,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     if local >= cutoff and not (pending and pending["end"] <= cutoff):
         res.update(status="expired", phase="after-close" if local >= close_dt else "after-cutoff",
                    reason="no %s by %s, the last time for a new entry%s" % (
-                       what, short(cutoff), " (1:00 p.m. early close today)" if early else ""))
+                       what, short(cutoff), " (2:10 p.m. early close today)" if early else ""))
         return res
     res["phase"] = "open"
     if last["c"] > lvl and last in thin:
@@ -641,7 +641,7 @@ def describe(res):
         if res.get("next_open"):
             out.append("Next open: %s Sydney." % res["next_open"])
     if res.get("early_close"):
-        out.append("Early close today at 1:00 p.m. (%s): no new entries after %s." % (
+        out.append("Early close today at 2:10 p.m. (%s): no new entries after %s." % (
             res["early_close"], res["no_entries_after"]))
     if not res.get("calendar_known"):
         out.append("Holiday list covers %s only: check asx.com.au for this date." % " and ".join(map(str, CALENDAR_YEARS)))

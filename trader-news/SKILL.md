@@ -2,14 +2,15 @@
 name: trader-news
 description: >-
   News Monitor. Tracks breaking news on every stock you watch and flags what
-  moves it: Yahoo Finance headlines per ticker, each company's 8-K filings on
-  company news (earnings, CEO changes, deals, restatements, bankruptcy) and how
+  moves it: Yahoo Finance headlines per ticker, each company's ASX
+  announcements (results, guidance, capital raisings, director changes, halts,
+  price-sensitive ones flagged) and how
   far each stock is from yesterday's close. Shows only what is new since the
   last check, newest first, in Sydney time, tags each item (earnings,
   analyst, deal, halt, regulatory, macro...) and never repeats one. Use when
   the user says "any news on BHP", "why is this moving", "what's the news on
   my watchlist", "morning briefing", "pre-market news", "monitor the news",
-  "did anything break", "check the 8-Ks", or after /trader-scanner finds setups.
+  "did anything break", "check the announcements", or after /trader-scanner finds setups.
 argument-hint: "[tickers]"
 ---
 
@@ -36,24 +37,23 @@ python3 "${CLAUDE_SKILL_DIR}/news.py" --no-sec --json
 | `--tickers`, else `trader/watchlist.json` | the scanner's hits (trader-scanner) |
 | `trader/plan.json` | the trade you are planning (trader-exit) |
 | `trader/portfolio.json` | what you hold (trader-broker records fills there) |
-| Yahoo Finance headline RSS | `https://feeds.finance.yahoo.com/rss/2.0/headline?s=BHP&region=US&lang=en-US` |
+| Yahoo Finance headline RSS | `https://feeds.finance.yahoo.com/rss/2.0/headline?s=BHP.AX&region=AU&lang=en-AU` |
 | Yahoo Finance chart endpoint | the last price against yesterday's close (unofficial, can lag) |
-| company news company Atom feed | 8-K by default (`--forms 8-K,10-Q` for more); needs `sec_user_agent` in `trader/config.json` or `ASX_USER_AGENT`, else filings are skipped with a note |
-| `trader/state/news.json` | what has been shown (kept 30 days) and each ticker's CIK |
+| ASX company announcements | `asx.api.markitdigital.com/asx-research/1.0/companies/<CODE>/announcements?pageSize=N`, free, no key; a price-sensitive one is marked `!` |
+| `trader/state/news.json` | what has been shown, kept 30 days |
 
 ## The rules
 
 - **Headlines are leads, not facts.** Before telling the user something
   happened, open the story or the filing and read it. Quote the source and
   link it. Never summarise a paywalled story you could not read: say so.
-- **Filings beat headlines.** If an 8-K and a headline disagree, the 8-K is
-  what the company told the ASX.
+- **Announcements beat headlines.** If an announcement and a headline
+  disagree, the announcement is what the company told the ASX.
 - **Say what it touches.** Every item lists the tickers it touches and its
   tags: earnings, analyst, legal, deal, capital, people, risk, halt,
-  regulatory, macro. Filings marked `!` carry an important 8-K item: earnings
-  results (2.02), an officer change (5.02), an impairment (2.06), a delisting
-  notice (3.01), past financials no longer reliable (4.02), bankruptcy (1.03)
-  or a cyber incident (1.05).
+  regulatory, macro. Announcements marked `!` are the ones the company itself
+  flagged as price sensitive: results, guidance, a capital raising, a director
+  change or a trading halt - the items that most often move the price.
 - **MOVING** marks a stock 3 % or more from yesterday's close (`--move-pct`).
   A move with no headline is worth saying out loud too.
 - **No predictions.** Report what was published and how far the price is from
@@ -78,16 +78,16 @@ morning before the open.
 
 ## Example: the reel
 
-Monday 2026-10-19, BHP broke its opening range at 10:15 AM AEST. The check at
-10:15 (Yahoo Finance's BHP feed, 16 headlines since 8:00) leads with the
-morning's real stories: "Meta and Musk earnings and September pending home
-sales: What to Watch" (8:00, earnings), "Tesla-SpaceX Merger Mania Strikes
-Wall Street Ahead of Earnings" (8:04, earnings, deal), "Tech Stock Rebound
-Nudges US Equity Futures Mostly Higher Pre-Bell" (8:02, macro). The brief:
-"Tesla reports this week, so the stock can gap overnight; today's trade is
-in and out before the close. No new 8-K." At 10:52 the price line reads
-`BHP 366.48 +3.31% vs yesterday's close 354.72 at 10:52 AEST  MOVING`. When a
-ticker has no news, say so rather than padding the brief.
+Friday 2026-10-23, BHP broke its opening range at 10:15 AM AEST. The check at
+10:15 (Yahoo Finance's BHP.AX feed) leads with the morning's real stories:
+"BHP quarterly production softer on weather" (8:00, earnings),
+"Rio, BHP flagged as iron ore price slips" (8:04, analyst, macro). The ASX
+announcements list adds the company's own filing: "Quarterly Activities
+Report" (market sensitive, earnings). The brief: "Results inside the trade
+window, so this can gap; in and out before the close. One new
+date-sensitive announcement." At 10:52 the price line reads `BHP 55.05 +3.31%
+vs yesterday's close 53.28 at 10:52 AEST  MOVING`. When a ticker has no news,
+say so rather than padding the brief.
 
 ## What it never does
 
