@@ -30,7 +30,7 @@ above the level yet); expired (no trigger by no_entries_after, default 15:30;
 on a 2:10 p.m. early close the cutoff moves up with the close);
 no-data (the market is closed today or Yahoo sent no bars).
 
-trader/config.json (optional): "no_entries_before" (09:45) and
+trader/config.json (optional): "no_entries_before" (10:15) and
 "no_entries_after" (15:30), Sydney time.
 
 watch wakes just after each bar closes (bars only change then), re-polls every
@@ -68,7 +68,7 @@ GRACE = 2        # seconds after a bar closes before watch asks for it
 SETTLE = 60      # seconds a closed bar may wait for Yahoo's data to catch up
 HOSTS = ("query2", "query1")
 INTERVALS = {"1m": 60, "5m": 300}
-DEFAULTS = {"no_entries_before": "09:45", "no_entries_after": "15:30"}
+DEFAULTS = {"no_entries_before": "10:15", "no_entries_after": "15:30"}
 EPOCH = datetime.datetime(1970, 1, 1)
 
 ASX_HOLIDAYS = {  # full-day closures; ASX trading calendar, read 2026-10-24
@@ -184,12 +184,12 @@ def parse_hhmm(text, what):
 
 
 def hm(t):
-    """10:10, 09:45: the contract's wall-clock form."""
+    """10:10, 10:15: the contract's wall-clock form."""
     return "%02d:%02d" % (t.hour, t.minute)
 
 
 def short(t):
-    """9:45, 10:10: for sentences."""
+    """10:15, 10:10: for sentences."""
     return "%d:%02d" % (t.hour, t.minute)
 
 

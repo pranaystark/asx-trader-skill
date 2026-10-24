@@ -4,26 +4,17 @@
     python3 scan.py universe                          # ASX lists -> trader/universe.txt
     python3 scan.py daily                             # before the open: daily setups -> trader/watchlist.json
     python3 scan.py daily --symbols BHP,CBA,CSL     # or --watchlist FILE, or --limit 200
-    python3 scan.py orb                               # after 9:50 AM AEST: opening-range breakouts so far
+    python3 scan.py orb                               # after 10:05 AM AEST: opening-range breakouts so far
     python3 scan.py orb --at 10:15 --or-minutes 15    # cut the clock at 10:15 AM AEST
     python3 scan.py orb --offline wall5m.json.gz --now "2026-10-19 10:15" --min-price 0
 
-universe  Downloads ASX's symbol directories (nasdaqlisted.txt and
-          exchanges) and keeps ASX-listed ordinary shares and ETFs
-          and ADRs. The rule, in order:
-            1. not a test issue, not an ETF, not NextShares
-            2. a plain ticker: 1 to 5 letters, or 1 to 4 letters plus one
-               class letter after a dot (BRK.B); a .U / .W / .R suffix
-               (units, warrants, rights) is out, and so is a $ preferred
-            3. out, whatever else the name says: warrants; SPAC units and
-               rights ("Units, each consisting of", "Rights to receive");
-               notes, ETNs, debentures; a % coupon; "Depositary Shares" that
-               are not American or Global (those carry a preferred)
-            4. in: the name calls it common stock / shares / units, ordinary
-               shares, shares of beneficial interest, ADS / ADR / American or
-               Global depositary shares, or partnership / trust units
-            5. out: the name still says unit, right, bond, preferred or preference
-            6. in: everything else (plain names like "AMETEK, Inc.")
+universe  Downloads the ASX listed-companies file
+          (asx.com.au/asx/research/ASXListedCompanies.csv) and keeps every
+          listing whose ASX code is a plain 2-6 character code (BHP, CBA,
+          DHHF, WES). The code is the filter, so there are no US-style
+          warrant / unit / preferred rules; ETFs and ordinary shares are
+          both kept, and each row carries its company name and GICS
+          industry group.
 
 daily     Pre-market scan of daily CLOSES (Yahoo spark: 20 symbols a request,
           3 months of 1-day bars, closes only). Liquidity from the spark meta:
@@ -60,7 +51,7 @@ a 429 or 5xx, one retry after a pause on a 429. A polite pause between
 requests (--pause). Partial results are reported as partial.
 
 --offline PATH reads files instead of the network: universe wants a folder
-with nasdaqlisted.txt and otherlisted.txt; daily and orb take a folder of
+holding ASXListedCompanies.csv; daily and orb take a folder of
 <T>.json v8 chart files or spark responses, or one file that is a spark
 response, a v8 chart, or a bundle {"BHP": <v8 json>, ...}. .json.gz is fine.
 
@@ -991,7 +982,7 @@ def main(argv=None):
 
     p = sub.add_parser("universe", help="download ASX's listed-companies file -> trader/universe.txt")
     p.add_argument("--out", default=DEFAULT_UNIVERSE)
-    p.add_argument("--offline", metavar="DIR", help="a folder with nasdaqlisted.txt and otherlisted.txt")
+    p.add_argument("--offline", metavar="DIR", help="a folder holding ASXListedCompanies.csv")
     p.add_argument("--no-write", action="store_true")
     p.add_argument("--pause", type=float, default=PAUSE)
     p.add_argument("--json", action="store_true")

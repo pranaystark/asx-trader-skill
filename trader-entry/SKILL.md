@@ -46,7 +46,7 @@ day bar by bar without waiting.
 | file | what |
 | --- | --- |
 | `trader/watchlist.json` | the scanner's hits (`hits[].symbol`), for `watchlist` |
-| `trader/config.json` | `no_entries_before` (09:45) and `no_entries_after` (15:30), Sydney time. Optional |
+| `trader/config.json` | `no_entries_before` (10:15) and `no_entries_after` (15:30), Sydney time. Optional |
 | Yahoo chart API | today's bars, `range=1d&interval=5m` (or `1m`): free, unofficial, can lag |
 | `trader/entry.json` | with `check --write`, or when `watch` triggers: symbol, setup, status, time, bar, price, level, opening range |
 
@@ -67,10 +67,10 @@ day bar by bar without waiting.
 - **Volume, if you want it.** `--min-volume-x 1.5` also needs the trigger
   bar's volume at 1.5 times the range bars' average. The 10:00 bar holds the
   opening auction, so 1.0 is already strict.
-- **Time limits.** No entries before 9:45 or after 15:30 (config). On a 1:00
-  p.m. early close the cutoff moves up with the close, to 12:30.
+- **Time limits.** No entries before 10:15 or after 15:30 (config). On a 2:10
+  p.m. early close the cutoff moves up with the close, to 13:40.
 - **What it says.** Waiting (and how far the last close is from the level),
-  triggered, expired, or no data. Before 10:00: not open yet. Before 9:45: the
+  triggered, expired, or no data. Before 10:00: not open yet. Before 10:15: the
   range is still forming. Weekends and ASX holidays: the market is closed.
 
 ## Steps
@@ -93,26 +93,36 @@ day bar by bar without waiting.
 
 ## Example: the reel
 
-BHP, Monday 2026-10-19, 5-minute bars. The opening range is 354.47 to
-362.18. At 10:12 the 10:10 bar is still open, so it waits:
+BHP.AX, Monday 2026-10-19, 5-minute bars. The session opens at 10:00 Sydney, so
+the 15-minute opening range is 10:00-10:15. At 10:12 the 10:10 bar is still
+open, so it waits:
 
 ```
-WAITING  last close $361.68 (10:05 bar), $0.50 under the range high $362.18 (-0.14%).
-The 10:10 bar is still forming ($364.18 so far, closes 10:15 AM); it does not count until it closes.
+BHP.AX  Mon 2026-10-19 10:12 AEST  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)
+Opening range 10:00-10:15: high $55.50, low $55.00 (2 of 3 bars, still forming).
+RANGE FORMING  2 of 3 range bars closed; the range is set at 10:15.
+The 10:10 bar is still forming ($55.72 so far, closes 10:15 AM); it does not count until it closes.
 ```
 
-At 10:15 the bar has closed:
+The range is set at 10:15, and the 10:15 bar closes above it at 10:20:
 
 ```
-BHP  Mon 2026-10-19 10:15 AEST  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)
-Opening range 10:00-9:45: high $362.18, low $354.47 (3 of 3 bars).
-TRIGGERED 10:15 AM at $364.18: the 10:10 bar (bar 8) closed above the range high $362.18 (+0.55%).
+BHP.AX  Mon 2026-10-19 10:20 AEST  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)
+Opening range 10:00-10:15: high $55.80, low $55.00 (3 of 3 bars).
+TRIGGERED 10:20 AM at $55.84: the 10:15 bar (bar 3) closed above the range high $55.80 (+0.07%).
 This is the moment to get in, if you take the trade. Nothing was placed.
 Next: set the stop and target BEFORE you buy: /trader-exit (exit.py plan --from trader/entry.json).
 ```
 
-With `--min-volume-x 1` the 10:10 bar is too thin (0.60x the range's volume)
-and the trigger moves to 10:35 AM at 365.75 (the 10:30 bar, 7.98x).
+With `--min-volume-x 1` that breakout bar is too thin (0.56x the range's
+volume), so it keeps waiting:
+
+```
+BHP.AX  Mon 2026-10-19 10:20 AEST  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)
+Opening range 10:00-10:15: high $55.80, low $55.00 (3 of 3 bars).
+WAITING  the 10:15 bar closed above at $55.84 but on 0.56x the range's volume, under your 1.00x.
+The 10:20 bar is still forming ($55.95 so far, closes 10:25 AM); it does not count until it closes.
+```
 
 ## Rules
 

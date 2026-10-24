@@ -60,8 +60,8 @@ This tool never talks to a broker itself. It writes the ticket - symbol, side,
 quantity, entry, stop-loss, take-profit, time-in-force - and prints the exact
 order fields. You place that order at your own ASX broker.
 
-Alpaca's MCP server only reaches US markets, and IBKR's your agent connector is
-not an ASX execution path to depend on, so on the ASX the last step is manual
+Alpaca's MCP server only reaches US markets, and the Interactive Brokers
+connector is not an ASX execution path to depend on, so on the ASX the last step is manual
 by design. No broker login, API key or 2FA code is ever needed here - and
 never ask for one, or read one back into the chat.
 
@@ -96,10 +96,10 @@ user's word-for-word yes comes first.
    order (for example "sure", "yes to all", or a yes that names a different
    stock or amount). Ask again. Never turn a reply into a yes yourself.
 4. Only after "Recorded your yes", call the order with exactly the
-   JSON the ticket printed. your agent's card appears: Allow once or Deny.
+   JSON the ticket printed. If your broker is wired in as a tool, its card appears: Allow once or Deny.
 5. Record what happened: `ticket.py result --index N --status placed
    --broker-id <id> --filled-qty Q --filled-price P` (the fill from the
-   response or `your broker's holdings view`), or `--status denied`, or `--status failed`
+   response or your broker's positions view), or `--status denied`, or `--status failed`
    with `--note`. A failed order is not retried without a new check and a new yes.
    The log keeps the entry's max loss for trader-risk's daily limit.
 
@@ -110,35 +110,37 @@ user's word-for-word yes comes first.
 - When the stop-loss or the take-profit fills, record it:
   `ticket.py fill --symbol BHP --side sell --qty 8 --price 358.32`.
 - By `flat_by` (15:55 Sydney), anything still open gets closed:
-  1. Ask your broker how many shares are held: `your broker's holdings view` (read only).
+  1. Ask your broker how many shares you hold (read only).
   2. `ticket.py flatten --symbol BHP --qty 8` writes a market sell for those
      shares to `trader/orders.json`.
   3. `/trader-risk`. A sell that only closes what the user holds is never
      blocked by the daily limits or the entry window.
   4. `ticket.py show`, then the user's yes for that one order, as above.
   5. The bracket's stop-loss and take-profit still hold those shares, so
-     your broker rejects a new sell until they are canceled: `get_orders` (status
-     open, nested true) shows them; your broker's cancel each one (Needs
-     approval). Then the order with the ticket, then `result`.
+     your broker rejects a new sell until they are canceled: list your open
+     orders at the broker and cancel the stop-loss and the take-profit (each
+     needs approval). Then place the sell with the ticket, then `result`.
 
 ## Example: the reel
 
 ```
-ORDER 1 of 1, PAPER account, your broker
+ORDER 1 of 1, PAPER account, your ASX broker
   BUY 8 BHP, market, good for today
   stop-loss 358.32
   take-profit 370.04
   max loss about $46.88 if the stop fills at 358.32 (it can fill worse in a fast market)
   why: opening-range breakout on BHP: 8 shares, bound by your $50 max loss per trade (8 x 5.86 = $46.88 at the stop)
   READY: trader-risk PASS, waiting for your yes
-  Your agent will call place_stock_order with exactly:
-    {"symbol": "BHP", "side": "buy", "qty": "8", "type": "market", "time_in_force": "day",
-     "order_class": "bracket", "take_profit_limit_price": "370.04", "stop_loss_stop_price": "358.32"}
+  Place these fields at your broker, exactly:
+    buy 8 BHP, market, good for today
+    take-profit 370.04 (limit sell)
+    stop-loss 358.32 (stop or stop-limit)
 ```
 
-The user replies "yes". your agent records it, calls the order, and the
-card reads "your agent wants to use Place stock order" with that JSON and two
-buttons: Allow once, Deny. Allow once sends it to the paper account. The
+The user replies "yes". Your agent records it with `ticket.py approve`, you
+place those fields at your broker, then record the fill with `ticket.py
+result`. If your broker is wired in as a tool, its card reads "wants to use
+Place stock order" with the fields and two buttons: Allow once, Deny. The
 `why` and the plan stay in the file; they are never sent.
 
 ## What it never does
@@ -146,8 +148,8 @@ buttons: Allow once, Deny. Allow once sends it to the paper account. The
 - Never places an order without all three gates, and never two orders on one yes.
 - Never places orders from a scheduled or background task: nobody is there to say yes.
 - Never asks for, reads, stores or repeats API keys or passwords.
-- Never switches `ALPACA_PAPER_TRADE` or `"paper"` to live. The user does that themselves.
-- Never calls `close_all_positions`, `cancel_all_orders`, option or crypto order tools on its own.
+- Never flips `"paper": true` to live. The user does that themselves.
+- Never cancels every order or closes every position on its own, and never touches options or crypto.
 - Never promises a fill price: a market order and a stop fill at whatever the market gives.
 
 ## Safety

@@ -14,7 +14,7 @@
   "no_entries_after": "15:45",
   "flat_by": "15:50",
   "fractional": false,
-  "broker": "alpaca",
+  "broker": "asx",
   "paper": true,
   "blocked": [],
   "allow_options": false,

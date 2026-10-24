@@ -41,7 +41,7 @@ import os
 import re
 import sys
 
-ALPACA_FIELDS = ("symbol", "side", "qty", "notional", "type", "time_in_force", "limit_price",
+ORDER_FIELDS = ("symbol", "side", "qty", "notional", "type", "time_in_force", "limit_price",
                  "stop_price", "trail_price", "trail_percent", "extended_hours", "client_order_id",
                  "order_class", "take_profit_limit_price", "stop_loss_stop_price",
                  "stop_loss_limit_price", "advanced_instructions")
@@ -148,7 +148,7 @@ def rec_day(rec):
 
 def fingerprint(order):
     """Same function as trader-risk/check.py: identifies the exact order."""
-    core = {k: order[k] for k in ALPACA_FIELDS if k in order and order[k] is not None}
+    core = {k: order[k] for k in ORDER_FIELDS if k in order and order[k] is not None}
     blob = json.dumps(core, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
@@ -174,7 +174,7 @@ def tool_input(order):
     numbers as strings (its signature types qty, notional and prices as str).
     "why" and "plan" are ours and are never sent."""
     out = {}
-    for k in ALPACA_FIELDS:
+    for k in ORDER_FIELDS:
         if k in order and order[k] is not None:
             out[k] = _str_num(order[k]) if k in STRING_FIELDS else order[k]
     return out
@@ -339,7 +339,7 @@ def status_of(order, risk, state, today):
     if rec:
         st = rec.get("status")
         if st == "approved":
-            return False, "APPROVED by you at %s, waiting for the place_stock_order call" % rec.get("at"), rv
+            return False, "APPROVED by you at %s, waiting for the order call at your broker" % rec.get("at"), rv
         return False, "DONE: %s at %s" % (st, rec.get("at")), rv
     return True, "READY: trader-risk PASS, waiting for your yes", rv
 
@@ -355,7 +355,7 @@ def kind_of(order, rv):
 
 def render(order, idx, total, cfg, risk, state, today):
     ready, label, rv = status_of(order, risk, state, today)
-    broker = str(cfg.get("broker", "alpaca")).lower()
+    broker = str(cfg.get("broker", "asx")).lower()
     paper = cfg.get("paper", True)
     acct = "PAPER account" if paper else "LIVE ACCOUNT, REAL MONEY"
     lines = ["ORDER %d of %d, %s, %s" % (idx, total, acct, "Interactive Brokers" if broker == "ibkr" else "your ASX broker")]
@@ -370,7 +370,7 @@ def render(order, idx, total, cfg, risk, state, today):
         lines.append("  Your agent drafts this with the Interactive Brokers connector. IBKR sends it to your")
         lines.append("  IBKR account, and it only goes to the market after you approve it there.")
     else:
-        lines.append("  Your agent will call place_stock_order with exactly:")
+        lines.append("  Place these fields at your broker, exactly:")
         for l in json.dumps(tool_input(order), indent=2).splitlines():
             lines.append("    " + l)
         if is_bracket(order):
@@ -379,7 +379,7 @@ def render(order, idx, total, cfg, risk, state, today):
     if ready:
         lines.append("  Reply \"yes\" to place this one order, or \"no\" to skip it.")
         if broker != "ibkr":
-            lines.append("  your agent's own approval card then asks again: Allow once places it, Deny stops it.")
+            lines.append("  If your broker is wired in as a tool, its card asks again: Allow once places it, Deny stops it.")
     return "\n".join(lines), ready
 
 
@@ -388,7 +388,7 @@ def ticket_json(order, idx, cfg, risk, state, today):
     loss, stop = max_loss(order)
     return {"index": idx, "ready": ready, "status": label, "plain": plain(order),
             "fingerprint": fingerprint(order), "paper": bool(cfg.get("paper", True)),
-            "broker": cfg.get("broker", "alpaca"), "tool": "place_stock_order",
+            "broker": cfg.get("broker", "asx"), "tool": "manual",
             "tool_input": tool_input(order), "why": order.get("why", ""),
             "bracket": is_bracket(order), "max_loss": loss, "stop": stop}
 
@@ -516,16 +516,16 @@ def cmd_approve(a):
            "symbol": str(order.get("symbol", "")).upper(), "side": order.get("side"),
            "qty": order.get("qty"), "kind": kind_of(order, rv), "max_loss": loss, "stop": stop,
            "plain": plain(order), "status": "approved", "reply": a.reply,
-           "paper": bool(cfg.get("paper", True)), "broker": cfg.get("broker", "alpaca")}
+           "paper": bool(cfg.get("paper", True)), "broker": cfg.get("broker", "asx")}
     state.setdefault("orders", []).append(rec)
     write_json(a.state, state)
     print("Recorded your yes for order %d: %s." % (a.index, plain(order)))
-    if str(cfg.get("broker", "alpaca")).lower() == "ibkr":
+    if str(cfg.get("broker", "asx")).lower() == "ibkr":
         print("Now draft it with the Interactive Brokers connector; approve it in your IBKR account.")
     else:
-        print("Now call place_stock_order with exactly:")
+        print("Now place these fields at your broker, exactly:")
         print(json.dumps(tool_input(order), indent=2))
-        print("your agent's card shows Allow once / Deny. Then: ticket.py result --index %d --status "
+        print("If your broker is wired in as a tool, its card shows Allow once / Deny. Then: ticket.py result --index %d --status "
               "placed|denied|failed" % a.index)
     return 0
 
@@ -621,14 +621,14 @@ def cmd_flatten(a):
     print("Wrote it to %s%s." % (a.orders, (" (it replaced %d earlier proposal%s)"
                                              % (replaced, "" if replaced == 1 else "s")) if replaced else ""))
     if a.qty is None:
-        print("The qty comes from %s. Check it against get_open_position %s before you say yes." % (source, sym))
+        print("The qty comes from %s. Check it against your broker's positions view for %s before you say yes." % (source, sym))
     print("Next:")
     print("  1. trader-risk: check.py. A sell that only closes what you hold is never blocked by the daily")
     print("     limits or the entry window.")
     print("  2. ticket.py show, then the user's yes for this one order.")
     print("  3. If the bracket's stop-loss and take-profit are still open, your broker holds these shares for them")
-    print("     and rejects a new sell. Cancel them first: get_orders (status open, nested true), then")
-    print("     cancel_order_by_id for each open leg (Needs approval). Then place_stock_order with the ticket.")
+    print("     and rejects a new sell. Cancel them first: list your open orders at the broker and")
+    print("     cancel each open leg, then place the sell with the ticket.")
     return 0
 
 

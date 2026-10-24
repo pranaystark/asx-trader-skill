@@ -119,33 +119,34 @@ not at the broker, a price too old to use, an early close today.
 
 ## Example: the reel
 
-The BHP bracket from trader-budget at 10:15 AM on Monday 2026-10-19, on a
-fresh $5,000 paper account with the example config:
+The BHP bracket from trader-budget (59 shares, entry 55.85, stop 55.01,
+target 57.53) checked at 10:20 Sydney on Monday 2026-10-19, on a fresh $5,000
+paper account with the example config:
 
 ```
-PASS  #1 buy BHP 8 shares, entry
-          entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share
-          max loss $46.88 (limit $50), reward:risk 1.00 (min 1)
+PASS  #1 buy BHP 59 shares, entry
+          entry 55.85 (the plan's entry), stop 55.01, target 57.53: risk 0.84 a share
+          max loss $49.56 (limit $50), reward:risk 2.00 (min 1)
           today before this: 0 of 3 trades, $0 of $150 daily loss
 
-1 passed, 0 blocked at 2026-10-19 10:15 Sydney. Cash after the passed orders: $2,086.56 (paper account).
+1 passed, 0 blocked at 2026-10-19 10:20 Sydney. Cash after the passed orders: $1,704.85 (paper account).
 ```
 
-One more share and it is blocked:
+One more share and the $50 stop-loss cap is breached:
 
 ```
-BLOCK #1 buy BHP 9 shares, entry
-          entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share
-          max loss $52.74 (limit $50), reward:risk 1.00 (min 1)
+BLOCK #1 buy BHP 60 shares, entry
+          entry 55.85 (the plan's entry), stop 55.01, target 57.53: risk 0.84 a share
+          max loss $50.40 (limit $50), reward:risk 2.00 (min 1)
           today before this: 0 of 3 trades, $0 of $150 daily loss
-        - loss: 9 shares x 5.86 risk a share = $52.74 at the stop, over your $50 max loss per trade
+        - loss: 60 shares x 0.84 risk a share = $50.40 at the stop, over your $50 max loss per trade
+
+0 passed, 1 blocked at 2026-10-19 10:20 Sydney. Cash after the passed orders: $5,000 (paper account).
 ```
 
-The same 8 shares checked at 10:55 with the real 10:52 quote (366.48) in
-`trader/prices.json` are blocked twice: 8 x 8.16 = $65.28 at the stop, and
-reward:risk 0.44. At 9:40 they are blocked by the window (no new entries
-before 9:45). The 3:55 PM sell that closes the position passes, even though
-it is after the 3:30 entry cutoff: it is an exit.
+The same order checked at 10:05 is blocked by the entry window instead (no new
+entries before 10:15 Sydney). The 3:50 p.m. sell that closes the position
+passes, even though it is after the 3:30 p.m. entry cutoff: it is an exit.
 
 ## Rules
 

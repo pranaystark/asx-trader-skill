@@ -30,7 +30,7 @@ the scanner does not change that. It only saves you from flipping through
 python3 "${CLAUDE_SKILL_DIR}/scan.py" universe                       # -> trader/universe.txt
 python3 "${CLAUDE_SKILL_DIR}/scan.py" daily                          # before the open -> trader/watchlist.json
 python3 "${CLAUDE_SKILL_DIR}/scan.py" daily --symbols BHP,CBA,CSL  # or --watchlist FILE, --limit 200
-python3 "${CLAUDE_SKILL_DIR}/scan.py" orb                            # after 9:50 AM AEST -> trader/watchlist.json
+python3 "${CLAUDE_SKILL_DIR}/scan.py" orb                            # after 10:05 AM AEST -> trader/watchlist.json
 python3 "${CLAUDE_SKILL_DIR}/scan.py" orb --at 10:15                 # cut the clock at 10:15 AM AEST
 python3 "${CLAUDE_SKILL_DIR}/scan.py" orb --watchlist trader/watchlist.json --json
 ```
@@ -55,19 +55,12 @@ reason is one plain line).
 `universe` downloads the ASX listed-companies file from
 asx.com.au/asx/research/ASXListedCompanies.csv and keeps one row per ASX code.
 
-1. It is not a test issue, not an ETF, not NextShares.
-2. It is a plain ticker: 1 to 5 letters, or 1 to 4 letters plus one class
-   letter after a dot (BRK.B). A `$` preferred (ABR$D) is out, and so is a
-   `.U`, `.W` or `.R` suffix (units, warrants, rights).
-3. Out, whatever else the name says: warrants; SPAC units and rights ("Units,
-   each consisting of", "Rights to receive"); notes, ETNs, debentures; a %
-   coupon; "Depositary Shares" that are not American or Global (those carry a
-   preferred).
-4. In: the name calls it common stock, common shares or units, ordinary
-   shares, shares of beneficial interest, ADS / ADR / American or Global
-   depositary shares, or partnership or trust units.
-5. Out: the name still says unit, right, bond, preferred or preference.
-6. In: everything else (plain names like "AMETEK, Inc.").
+1. The ASX code is a plain 2-6 character code (BHP, CBA, DHHF, WES). Every
+   other row of the file is a different listing type and is left out.
+2. ETFs and ordinary shares are both kept: ASX codes are the filter, so
+   there is no warrant, unit or preferred rule set like the US one.
+3. Each kept row carries its company name and GICS industry group, so a
+   hit reads `BHP|BHP Group Limited`.
 
 On the Oct 19 2026 files this keeps 5,943. The reel said 5,259: that count
 came from an ad hoc filter (names that say common or ordinary, no ADRs). All
@@ -126,9 +119,9 @@ the daily watchlist or a list of names you trade (`--watchlist`, `--symbols`).
 A chart is usable only when every 5-minute bar from 10:00 to the cutoff is
 there; a missing bar means a halt or a thin stock. Null closes are dropped,
 a bar off the 5-minute grid (the live tick, like 10:58:07) is dropped, and a
-bar counts only once it is complete (start + 5 minutes). Before 9:50 AM, on a
+bar counts only once it is complete (start + 5 minutes). Before 10:00 AM, on a
 weekend or holiday, after the close, or after `no_entries_after` (an expired
-setup) it prints one plain line and writes nothing. The 1:00 PM early closes
+setup) it prints one plain line and writes nothing. The 2:10 PM early closes
 are in the calendar.
 
 ## Data and limits
@@ -145,38 +138,38 @@ are in the calendar.
 1. Once a week or so: `scan.py universe`.
 2. Before the open: `scan.py daily`. Tell the user the counts (fetched,
    liquid, scanned, hits) and the top few by setup.
-3. After 9:50 AM AEST (10:15 is the classic): `scan.py orb`. Tell the user how
+3. After 10:05 AM AEST (10:20 is the classic): `scan.py orb`. Tell the user how
    many usable charts broke their range and when, and that a later hit is
    closer to the price now.
 4. The user picks one chart. Hand it on: `/trader-news TICKER` (what is moving
    it), then `/trader-entry TICKER` (the entry bar by bar). Never pick for them.
 
-## Example: the reel
+## Example: a live scan
 
-Monday Oct 19 2026, scan at 10:15 AM over the reel's 234-ticker wall
-(`tests/fixtures/trader-scanner/wall5m-2026-10-19.json.gz`, real Yahoo charts):
+A pre-market pass over nine ASX large caps (Yahoo spark, daily closes only):
 
 ```
-python3 scan.py orb --offline wall5m-2026-10-19.json.gz --now "2026-10-19 10:15" --min-price 0
-Fetched 233 of 234 charts (1 failed or had no data); 231 usable; 95 candidates, 95 confirmed with real highs and lows.
-42 of 231 charts closed above their opening-range high by 10:15 AM:
-   9:50 AM  AMC         $2.97  range 2.90 to 2.96  +0.50% over
-  ...
-  10:15 AM  BHP      $364.18  range 354.47 to 362.18  +0.55% over
+python3 scan.py daily --symbols BHP,CBA,CSL,NAB,WES,FMG,TLS,RIO,FMG,ANZ --limit 10
+Fetching daily closes for 9 symbols (1 spark requests)...
+Daily scan, Sat 2026-10-24 17:56 AEST, closes through 2026-10-23 (Yahoo spark, daily closes only).
+Fetched 9 of 9 charts. 8 passed the liquidity filter ($5+ and 1,000,000+ shares); 8 scanned.
+7 charts matched a setup: 5 20-day closing-high breakout, 2 oversold (RSI under 30).
+Most traded first (price x volume):
+  CBA       $164.00  RSI  68.0  20-day closing-high breakout
+  NAB        $41.31  RSI  64.7  20-day closing-high breakout
+  RIO       $146.27  RSI  26.8  oversold (RSI under 30)
+  CSL       $196.70  RSI  76.9  20-day closing-high breakout
+  ANZ        $40.04  RSI  68.1  20-day closing-high breakout
+  WES        $80.29  RSI  62.1  20-day closing-high breakout
+  FMG        $14.27  RSI  25.3  oversold (RSI under 30)
+Wrote trader/watchlist.json (mode daily, 7 hits).
 ```
 
-The reel's wall had no price floor (AMC at $2.97 is one of the 42), hence
-`--min-price 0`; with the default $5 floor it is 41. BHP's range is the 10:00
-to 9:40 bars, high 362.18, low 354.47; the 10:10 bar closed at 364.18, 0.55 %
-over the high, at 10:15 AM. The user picks BHP and your agent hands it to
-`/trader-news BHP`, then `/trader-entry BHP`. In the reel the universe was
-5,259 ASX stocks; this tool's rule gives 5,943 on the same files.
-
-The pre-market scan that morning (closes through Fri Oct 16, the reel's daily
-charts) tags BLK, CI, XOM and HD a 20-day breakout, CCL a bull flag, F, JPM
-and GE a reclaim of the 20-day average, and BAC, MS, RIVN and PLUG oversold,
-as the reel did. On closes it also tags KO (breakout), RCL (flag) and PNC (an
-oversold bounce).
+`daily` runs before the open on the last session's closes; `orb` needs every
+5-minute bar from 10:00 to the cutoff, so it can only run once the opening
+range is set (`--at 10:20` for the 10:00-10:15 range). Say what was scanned
+and when, say "matched a rule", and hand the one chart the user picks to
+`/trader-news TICKER`, then `/trader-entry TICKER`. Nothing here is a buy list.
 
 ## Rules
 
